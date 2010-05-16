@@ -1,6 +1,8 @@
 #ifndef __PLAT_DMA_H
 #define __PLAT_DMA_H
 
+#include <mach/dma.h>
+
 #define DMAC_REG(x)	(*((volatile u32 *)(DMAC_REGS_VIRT + (x))))
 
 #define DCSR(n)		DMAC_REG((n) << 2)

@@ -240,6 +240,10 @@ struct hc_driver {
 	void	(*relinquish_port)(struct usb_hcd *, int);
 		/* has a port been handed over to a companion? */
 	int	(*port_handed_over)(struct usb_hcd *, int);
+#ifdef CONFIG_USB_OTG
+	int	(*disconnect)(struct usb_hcd *);
+	int	(*connect)(struct usb_hcd *, struct usb_device *udev);
+#endif
 
 		/* CLEAR_TT_BUFFER completion callback */
 	void	(*clear_tt_buffer_complete)(struct usb_hcd *,

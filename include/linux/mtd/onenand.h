@@ -116,6 +116,7 @@ struct onenand_chip {
 	void (*mmcontrol)(struct mtd_info *mtd, int sync_read);
 	int (*block_markbad)(struct mtd_info *mtd, loff_t ofs);
 	int (*scan_bbt)(struct mtd_info *mtd);
+	int (*block_bad)(struct mtd_info *mtd, loff_t ofs, int allowbbt);
 
 	struct completion	complete;
 	int			irq;
@@ -178,6 +179,7 @@ struct onenand_chip {
 #define ONENAND_SKIP_UNLOCK_CHECK	(0x0100)
 #define ONENAND_PAGEBUF_ALLOC		(0x1000)
 #define ONENAND_OOBBUF_ALLOC		(0x2000)
+#define ONENAND_RELOC_IFBAD             (0x4000)
 
 /*
  * OneNAND Flash Manufacturer ID Codes

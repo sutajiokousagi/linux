@@ -251,6 +251,14 @@ config BACKLIGHT_SAHARA
 	  If you have a Tabletkiosk Sahara Touch-iT, say y to enable the
 	  backlight driver.
 
+config BACKLIGHT_PORTOFINO
+	tristate "Marvell PORTOFINO(PM8606) Backlight Driver"
+	depends on BACKLIGHT_CLASS_DEVICE && PORTOFINO
+	default y
+	help
+	  If you have a LCD backlight connected to the WLED output of PORTOFINO
+	  WLED output, say Y here to enable this driver.
+
 config BACKLIGHT_WM831X
 	tristate "WM831x PMIC Backlight Driver"
 	depends on BACKLIGHT_CLASS_DEVICE && MFD_WM831X

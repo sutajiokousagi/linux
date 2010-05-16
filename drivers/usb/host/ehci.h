@@ -151,6 +151,10 @@ struct ehci_hcd {			/* one per controller */
 #	define COUNT(x) do {} while (0)
 #endif
 
+#ifdef CONFIG_USB_OTG
+	struct otg_transceiver *transceiver;
+#endif
+
 	/* debug files */
 #ifdef DEBUG
 	struct dentry		*debug_dir;

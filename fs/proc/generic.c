@@ -822,7 +822,10 @@ void remove_proc_entry(const char *name, struct proc_dir_entry *parent)
 	}
 	spin_unlock(&proc_subdir_lock);
 	if (!de) {
+#warning disabling proc warning !de
+#if 0
 		WARN(1, "name '%s'\n", name);
+#endif
 		return;
 	}
 

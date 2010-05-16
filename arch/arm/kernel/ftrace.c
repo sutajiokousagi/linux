@@ -12,6 +12,7 @@
  */
 
 #include <linux/ftrace.h>
+#include <linux/uaccess.h>
 
 #include <asm/cacheflush.h>
 #include <asm/ftrace.h>
@@ -21,11 +22,29 @@
 #define BL_OFFSET_MASK 0x00ffffff
 
 static unsigned long bl_insn;
-static const unsigned long NOP = 0xe1a00000; /* mov r0, r0 */
+/*
+ * for some arm toolchain like android toolchain would put a conditional
+ * instruction after mcount calling, so we need refresh the CPSR
+ * to jump over this inst
+ */
+static const unsigned long NOP = 0xe328f206; /* msr CPSR_f, #0x60000000 */
+static const unsigned long LDMIA = 0xE8BD4000; /* ldmia   sp!, {lr} */
 
 unsigned char *ftrace_nop_replace(void)
 {
-	return (char *)&NOP;
+	char *ret_vaule;
+#ifndef KBUILD_NEW_GNU_MCOUNT
+	ret_vaule = (char *)&NOP;
+#else
+	/*
+	 * For the arm toolchain change the mount to __gnu_mount_nc since 4.1.1
+	 * and it add "push {lr}" behavior before call the __gnu_mount_nc,
+	 * so we need to restore the lr, when we try to replace the jmp code
+	 * to a normal code that don't impact performance
+	 */
+	ret_vaule = (char *)&LDMIA;
+#endif
+	return ret_vaule;
 }
 
 /* construct a branch (BL) instruction to addr */
@@ -79,7 +98,7 @@ int ftrace_modify_code(unsigned long pc, unsigned char *old_code,
 	if (!err && (replaced == old))
 		flush_icache_range(pc, pc + MCOUNT_INSN_SIZE);
 
-	return err;
+	return 0;
 }
 
 int ftrace_update_ftrace_func(ftrace_func_t func)
@@ -95,9 +114,32 @@ int ftrace_update_ftrace_func(ftrace_func_t func)
 	return ret;
 }
 
+int ftrace_make_nop(struct module *mod,
+		struct dyn_ftrace *rec, unsigned long addr)
+{
+	unsigned char *new, *old;
+	unsigned long ip = rec->ip;
+
+	old = ftrace_call_replace(ip, addr);
+	new = ftrace_nop_replace();
+
+	return ftrace_modify_code(rec->ip, old, new);
+}
+
+int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
+{
+	unsigned char *new, *old;
+	unsigned long ip = rec->ip;
+
+	old = ftrace_nop_replace();
+	new = ftrace_call_replace(ip, addr);
+
+	return ftrace_modify_code(rec->ip, old, new);
+}
+
 /* run from ftrace_init with irqs disabled */
 int __init ftrace_dyn_arch_init(void *data)
 {
-	ftrace_mcount_set(data);
+	*(unsigned long *)data = 0;
 	return 0;
 }

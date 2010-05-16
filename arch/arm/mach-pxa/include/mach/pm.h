@@ -27,8 +27,11 @@ extern void pxa27x_cpu_suspend(unsigned int);
 extern void pxa_cpu_resume(void);
 
 extern int pxa_pm_enter(suspend_state_t state);
+<<<<<<< HEAD:arch/arm/mach-pxa/include/mach/pm.h
+=======
 extern int pxa_pm_prepare(void);
 extern void pxa_pm_finish(void);
+>>>>>>> e40152ee1e1c7a63f4777791863215e3faa37a86:arch/arm/mach-pxa/include/mach/pm.h
 
 /* NOTE: this is for PM debugging on Lubbock,  it's really a big
  * ugly, but let's keep the crap minimum here, instead of direct

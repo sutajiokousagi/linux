@@ -98,6 +98,9 @@
 #include <net/sock.h>
 #include <linux/netfilter.h>
 
+#ifdef CONFIG_UID_STAT
+#include <linux/uid_stat.h>
+#endif
 #include <linux/if_tun.h>
 #include <linux/ipv6_route.h>
 #include <linux/route.h>
@@ -551,7 +554,12 @@ static inline int __sock_sendmsg(struct kiocb *iocb, struct socket *sock,
 	if (err)
 		return err;
 
-	return sock->ops->sendmsg(iocb, sock, msg, size);
+	err = sock->ops->sendmsg(iocb, sock, msg, size);
+#ifdef CONFIG_UID_STAT
+	if (err > 0)
+		update_tcp_snd(current_uid(), err);
+#endif
+	return err;
 }
 
 int sock_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)

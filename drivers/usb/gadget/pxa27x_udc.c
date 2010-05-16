@@ -43,6 +43,14 @@
 
 #include "pxa27x_udc.h"
 
+static char *ep0_state_name[] = {
+        "WAIT_FOR_SETUP", "SETUP_STAGE", "IN_DATA_STAGE", "OUT_DATA_STAGE",
+        "IN_STATUS_STAGE", "OUT_STATUS_STAGE", "STALL",
+        "WAIT_ACK_SET_CONF_INTERF"
+};
+
+#define EP0_STNAME(udc) ep0_state_name[(udc)->ep0state]
+
 /*
  * This driver handles the USB Device Controller (UDC) in Intel's PXA 27x
  * series processors.

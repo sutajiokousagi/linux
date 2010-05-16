@@ -68,7 +68,7 @@ obj-$(CONFIG_VIDEO_VP27SMPX) += vp27smpx.o
 obj-$(CONFIG_VIDEO_CX25840) += cx25840/
 obj-$(CONFIG_VIDEO_UPD64031A) += upd64031a.o
 obj-$(CONFIG_VIDEO_UPD64083) += upd64083.o
-obj-$(CONFIG_VIDEO_OV7670) 	+= ov7670.o
+#obj-$(CONFIG_VIDEO_OV7670) 	+= ov7670.o
 obj-$(CONFIG_VIDEO_TCM825X) += tcm825x.o
 obj-$(CONFIG_VIDEO_TVEEPROM) += tveeprom.o
 obj-$(CONFIG_VIDEO_MT9V011) += mt9v011.o
@@ -122,6 +122,11 @@ obj-$(CONFIG_VIDEO_M32R_AR_M64278) += arv.o
 obj-$(CONFIG_VIDEO_CX2341X) += cx2341x.o
 
 obj-$(CONFIG_VIDEO_CAFE_CCIC) += cafe_ccic.o
+obj-$(CONFIG_VIDEO_OV7660)      += ov7660.o
+obj-$(CONFIG_VIDEO_OV7670) 	+= ov7670_pxa.o
+obj-$(CONFIG_VIDEO_OV3640)      += ov3640.o
+obj-$(CONFIG_VIDEO_OV7740) 	+= ov7740.o
+obj-$(CONFIG_VIDEO_TCM825X) += tcm825x.o
 
 obj-$(CONFIG_USB_DABUSB)        += dabusb.o
 obj-$(CONFIG_USB_OV511)         += ov511.o
@@ -163,6 +168,11 @@ obj-$(CONFIG_VIDEO_SH_MOBILE_CEU)	+= sh_mobile_ceu_camera.o
 obj-$(CONFIG_VIDEO_AU0828) += au0828/
 
 obj-$(CONFIG_USB_VIDEO_CLASS)	+= uvc/
+obj-$(CONFIG_PXA168_CAMERA)          += pxa168_camera.o
+obj-$(CONFIG_VIDEO_OV529)	+= ov529_drv.o ov529_smc.o
+obj-$(CONFIG_VIDEO_SIV120A)          += siv120a.o
+obj-$(CONFIG_CLI5001_ISP)          += cli5001.o
+obj-$(CONFIG_CMMB_CA)             += cmmb/
 obj-$(CONFIG_VIDEO_SAA7164)     += saa7164/
 
 obj-$(CONFIG_VIDEO_IR_I2C)  += ir-kbd-i2c.o

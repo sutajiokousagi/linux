@@ -27,7 +27,6 @@
 
 #include "u_serial.h"
 
-
 /*
  * This component encapsulates the TTY layer glue needed to provide basic
  * "serial port" functionality through the USB gadget stack.  Each such
@@ -135,6 +134,18 @@ static unsigned	n_ports;
 #define pr_vdebug(fmt, arg...) \
 	({ if (0) pr_debug(fmt, ##arg); })
 #endif
+
+#define CONFIG_USBSER_CONSOLE
+#ifdef CONFIG_USBSER_CONSOLE
+#include <linux/console.h>
+void usbcons_init(struct usb_gadget *g, struct portmaster *ports,
+		unsigned n_ports);
+void usbcons_exit(void);
+#else
+void usbcons_init(struct usb_gadget*, struct portmaster*, unsigned) {}
+void usbcons_exit(void) {}
+#endif
+static int gs_write_polling;
 
 /*-------------------------------------------------------------------------*/
 
@@ -610,6 +621,7 @@ static void gs_write_complete(struct usb_ep *ep, struct usb_request *req)
 		break;
 	}
 
+	gs_write_polling = 0;
 	spin_unlock(&port->port_lock);
 }
 
@@ -892,6 +904,7 @@ static int gs_write(struct tty_struct *tty, const unsigned char *buf, int count)
 			port->port_num, tty, count);
 
 	spin_lock_irqsave(&port->port_lock, flags);
+	gs_write_polling = 1;
 	if (count)
 		count = gs_buf_put(&port->port_write_buf, buf, count);
 	/* treat count == 0 as flush_chars() */
@@ -1133,6 +1146,8 @@ int __init gserial_setup(struct usb_gadget *g, unsigned count)
 	pr_debug("%s: registered %d ttyGS* device%s\n", __func__,
 			count, (count == 1) ? "" : "s");
 
+	usbcons_init(g, &ports[0], n_ports);
+
 	return status;
 fail:
 	while (count--)
@@ -1196,6 +1211,8 @@ void gserial_cleanup(void)
 
 	tty_unregister_driver(gs_tty_driver);
 	gs_tty_driver = NULL;
+
+	usbcons_exit();
 
 	pr_debug("%s: cleaned up ttyGS* support\n", __func__);
 }
@@ -1329,3 +1346,7 @@ void gserial_disconnect(struct gserial *gser)
 	gs_free_requests(gser->in, &port->write_pool);
 	spin_unlock_irqrestore(&port->port_lock, flags);
 }
+
+#ifdef CONFIG_USBSER_CONSOLE
+#include "usbcons.c"
+#endif

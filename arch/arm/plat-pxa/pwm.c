@@ -14,26 +14,13 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
-#include <linux/slab.h>
 #include <linux/err.h>
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/pwm.h>
 
 #include <asm/div64.h>
-
-#define HAS_SECONDARY_PWM	0x10
-#define PWM_ID_BASE(d)		((d) & 0xf)
-
-static const struct platform_device_id pwm_id_table[] = {
-	/*   PWM    has_secondary_pwm? */
-	{ "pxa25x-pwm", 0 },
-	{ "pxa27x-pwm", 0 | HAS_SECONDARY_PWM },
-	{ "pxa168-pwm", 1 },
-	{ "pxa910-pwm", 1 },
-	{ },
-};
-MODULE_DEVICE_TABLE(platform, pwm_id_table);
+#include <linux/slab.h>
 
 /* PWM registers and bits definitions */
 #define PWMCR		(0x00)
@@ -45,8 +32,7 @@ MODULE_DEVICE_TABLE(platform, pwm_id_table);
 
 struct pwm_device {
 	struct list_head	node;
-	struct pwm_device	*secondary;
-	struct platform_device	*pdev;
+	struct platform_device *pdev;
 
 	const char	*label;
 	struct clk	*clk;
@@ -90,11 +76,12 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
 	/* NOTE: the clock to PWM has to be enabled first
 	 * before writing to the registers
 	 */
-	clk_enable(pwm->clk);
-	__raw_writel(prescale, pwm->mmio_base + PWMCR);
-	__raw_writel(dc, pwm->mmio_base + PWMDCR);
+	pwm_enable(pwm);
+	__raw_writel(prescale|0x040, pwm->mmio_base + PWMCR);
 	__raw_writel(pv, pwm->mmio_base + PWMPCR);
-	clk_disable(pwm->clk);
+	__raw_writel(dc, pwm->mmio_base + PWMDCR);
+
+	pwm_disable(pwm);
 
 	return 0;
 }
@@ -174,20 +161,20 @@ static inline void __add_pwm(struct pwm_device *pwm)
 	mutex_unlock(&pwm_lock);
 }
 
-static int __devinit pwm_probe(struct platform_device *pdev)
+static struct pwm_device *pwm_probe(struct platform_device *pdev,
+		unsigned int pwm_id, struct pwm_device *parent_pwm)
 {
-	struct platform_device_id *id = platform_get_device_id(pdev);
-	struct pwm_device *pwm, *secondary = NULL;
+	struct pwm_device *pwm;
 	struct resource *r;
 	int ret = 0;
 
 	pwm = kzalloc(sizeof(struct pwm_device), GFP_KERNEL);
 	if (pwm == NULL) {
 		dev_err(&pdev->dev, "failed to allocate memory\n");
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 	}
 
-	pwm->clk = clk_get(&pdev->dev, NULL);
+	pwm->clk = clk_get(&pdev->dev, "PWMCLK");
 	if (IS_ERR(pwm->clk)) {
 		ret = PTR_ERR(pwm->clk);
 		goto err_free;
@@ -195,8 +182,15 @@ static int __devinit pwm_probe(struct platform_device *pdev)
 	pwm->clk_enabled = 0;
 
 	pwm->use_count = 0;
-	pwm->pwm_id = PWM_ID_BASE(id->driver_data) + pdev->id;
+	pwm->pwm_id = pwm_id;
 	pwm->pdev = pdev;
+
+	if (parent_pwm != NULL) {
+		/* registers for the second PWM has offset of 0x10 */
+		pwm->mmio_base = parent_pwm->mmio_base + 0x10;
+		__add_pwm(pwm);
+		return pwm;
+	}
 
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (r == NULL) {
@@ -205,49 +199,66 @@ static int __devinit pwm_probe(struct platform_device *pdev)
 		goto err_free_clk;
 	}
 
-	r = request_mem_region(r->start, resource_size(r), pdev->name);
+	r = request_mem_region(r->start, r->end - r->start + 1, pdev->name);
 	if (r == NULL) {
 		dev_err(&pdev->dev, "failed to request memory resource\n");
 		ret = -EBUSY;
 		goto err_free_clk;
 	}
 
-	pwm->mmio_base = ioremap(r->start, resource_size(r));
+	pwm->mmio_base = ioremap(r->start, r->end - r->start + 1);
 	if (pwm->mmio_base == NULL) {
 		dev_err(&pdev->dev, "failed to ioremap() registers\n");
 		ret = -ENODEV;
 		goto err_free_mem;
 	}
 
-	if (id->driver_data & HAS_SECONDARY_PWM) {
-		secondary = kzalloc(sizeof(struct pwm_device), GFP_KERNEL);
-		if (secondary == NULL) {
-			ret = -ENOMEM;
-			goto err_free_mem;
-		}
-
-		*secondary = *pwm;
-		pwm->secondary = secondary;
-
-		/* registers for the second PWM has offset of 0x10 */
-		secondary->mmio_base = pwm->mmio_base + 0x10;
-		secondary->pwm_id = pdev->id + 2;
-	}
-
 	__add_pwm(pwm);
-	if (secondary)
-		__add_pwm(secondary);
-
 	platform_set_drvdata(pdev, pwm);
-	return 0;
+	return pwm;
 
 err_free_mem:
-	release_mem_region(r->start, resource_size(r));
+	release_mem_region(r->start, r->end - r->start + 1);
 err_free_clk:
 	clk_put(pwm->clk);
 err_free:
 	kfree(pwm);
-	return ret;
+	return ERR_PTR(ret);
+}
+
+static int __devinit pxa25x_pwm_probe(struct platform_device *pdev)
+{
+	struct pwm_device *pwm = pwm_probe(pdev, pdev->id, NULL);
+
+	if (IS_ERR(pwm))
+		return PTR_ERR(pwm);
+
+	return 0;
+}
+
+static int __devinit pxa27x_pwm_probe(struct platform_device *pdev)
+{
+	struct pwm_device *pwm;
+
+	pwm = pwm_probe(pdev, pdev->id, NULL);
+	if (IS_ERR(pwm))
+		return PTR_ERR(pwm);
+
+	pwm = pwm_probe(pdev, pdev->id + 2, pwm);
+	if (IS_ERR(pwm))
+		return PTR_ERR(pwm);
+
+	return 0;
+}
+
+static int __devinit pxa168_pwm_probe(struct platform_device *pdev)
+{
+	struct pwm_device *pwm = pwm_probe(pdev, pdev->id, NULL);
+
+	if (IS_ERR(pwm))
+		return PTR_ERR(pwm);
+
+	return 0;
 }
 
 static int __devexit pwm_remove(struct platform_device *pdev)
@@ -260,44 +271,74 @@ static int __devexit pwm_remove(struct platform_device *pdev)
 		return -ENODEV;
 
 	mutex_lock(&pwm_lock);
-
-	if (pwm->secondary) {
-		list_del(&pwm->secondary->node);
-		kfree(pwm->secondary);
-	}
-
 	list_del(&pwm->node);
 	mutex_unlock(&pwm_lock);
 
 	iounmap(pwm->mmio_base);
 
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	release_mem_region(r->start, resource_size(r));
+	release_mem_region(r->start, r->end - r->start + 1);
 
 	clk_put(pwm->clk);
 	kfree(pwm);
 	return 0;
 }
 
-static struct platform_driver pwm_driver = {
+static struct platform_driver pxa25x_pwm_driver = {
 	.driver		= {
 		.name	= "pxa25x-pwm",
-		.owner	= THIS_MODULE,
 	},
-	.probe		= pwm_probe,
+	.probe		= pxa25x_pwm_probe,
 	.remove		= __devexit_p(pwm_remove),
-	.id_table	= pwm_id_table,
+};
+
+static struct platform_driver pxa27x_pwm_driver = {
+	.driver		= {
+		.name	= "pxa27x-pwm",
+	},
+	.probe		= pxa27x_pwm_probe,
+	.remove		= __devexit_p(pwm_remove),
+};
+
+static struct platform_driver pxa168_pwm_driver = {
+	.driver		= {
+		.name	= "pxa168-pwm",
+	},
+	.probe		= pxa168_pwm_probe,
+	.remove		= __devexit_p(pwm_remove),
 };
 
 static int __init pwm_init(void)
 {
-	return platform_driver_register(&pwm_driver);
+	int ret = 0;
+
+	ret = platform_driver_register(&pxa25x_pwm_driver);
+	if (ret) {
+		printk(KERN_ERR "failed to register pxa25x_pwm_driver\n");
+		return ret;
+	}
+
+	ret = platform_driver_register(&pxa27x_pwm_driver);
+	if (ret) {
+		printk(KERN_ERR "failed to register pxa27x_pwm_driver\n");
+		return ret;
+	}
+
+	ret = platform_driver_register(&pxa168_pwm_driver);
+	if (ret) {
+		printk(KERN_ERR "failed to register pxa168_pwm_driver\n");
+		return ret;
+	}
+
+	return ret;
 }
 arch_initcall(pwm_init);
 
 static void __exit pwm_exit(void)
 {
-	platform_driver_unregister(&pwm_driver);
+	platform_driver_unregister(&pxa25x_pwm_driver);
+	platform_driver_unregister(&pxa27x_pwm_driver);
+	platform_driver_unregister(&pxa168_pwm_driver);
 }
 module_exit(pwm_exit);
 

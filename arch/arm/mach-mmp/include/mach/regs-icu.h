@@ -17,18 +17,23 @@
 #define ICU_REG(x)	(ICU_VIRT_BASE + (x))
 
 #define ICU_INT_CONF(n)		ICU_REG((n) << 2)
-#define ICU_INT_CONF_MASK	(0xf)
-
-/************ PXA168/PXA910 (MMP) *********************/
 #define ICU_INT_CONF_AP_INT	(1 << 6)
 #define ICU_INT_CONF_CP_INT	(1 << 5)
 #define ICU_INT_CONF_IRQ	(1 << 4)
+#define ICU_INT_CONF_MASK	(0xf)
 
-#define ICU_AP_FIQ_SEL_INT_NUM	ICU_REG(0x108)	/* AP FIQ Selected Interrupt */
-#define ICU_AP_IRQ_SEL_INT_NUM	ICU_REG(0x10C)	/* AP IRQ Selected Interrupt */
-#define ICU_AP_GBL_IRQ_MSK	ICU_REG(0x114)	/* AP Global Interrupt Mask */
-#define ICU_INT_STATUS_0	ICU_REG(0x128)	/* Interrupt Stuats 0 */
-#define ICU_INT_STATUS_1	ICU_REG(0x12C)	/* Interrupt Status 1 */
+#define ICU_AP_FIQ_SEL_INT_NUM		ICU_REG(0x108)	/* AP FIQ Selected Interrupt */
+#define ICU_AP_IRQ_SEL_INT_NUM		ICU_REG(0x10C)	/* AP IRQ Selected Interrupt */
+#define ICU_AP_GBL_IRQ_MSK		ICU_REG(0x114)	/* AP Global Interrupt Mask */
+#define ICU_DMA_INT_MSK			ICU_REG(0x11C)	/* */
+#define ICU_DMA_INT_STATUS		ICU_REG(0x124)	/* */
+#define ICU_INT_STATUS_0		ICU_REG(0x128)	/* Interrupt Stuats 0 */
+#define ICU_INT_STATUS_1		ICU_REG(0x12C)	/* Interrupt Status 1 */
+#define ICU_DDR_ARM_L2_INT_MSK		ICU_REG(0x130)	/* */
+#define ICU_DDR_ARM_L2_INT_STATUS	ICU_REG(0x134)	/* */
+
+#define ICU_AP_GBL_IRQ_MSK_IRQ_MSK (1 << 1)
+#define ICU_AP_GBL_IRQ_MSK_FIQ_MSK (1 << 0)
 
 /************************** MMP2 ***********************/
 

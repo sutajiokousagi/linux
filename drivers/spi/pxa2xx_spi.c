@@ -34,11 +34,12 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/delay.h>
+#include <asm/dma.h>
 
 #include <mach/dma.h>
 #include <mach/regs-ssp.h>
 #include <mach/ssp.h>
-#include <mach/pxa2xx_spi.h>
+#include <plat/pxa2xx_spi.h>
 
 MODULE_AUTHOR("Stephen Street");
 MODULE_DESCRIPTION("PXA2xx SSP SPI Controller");
@@ -350,6 +351,7 @@ static int map_dma_buffers(struct driver_data *drv_data)
 {
 	struct spi_message *msg = drv_data->cur_msg;
 	struct device *dev = &msg->spi->dev;
+	struct spi_transfer *transfer = drv_data->cur_transfer;
 
 	if (!drv_data->cur_chip->enable_dma)
 		return 0;
@@ -364,6 +366,7 @@ static int map_dma_buffers(struct driver_data *drv_data)
 	if (drv_data->rx == NULL) {
 		*drv_data->null_dma_buf = 0;
 		drv_data->rx = drv_data->null_dma_buf;
+		drv_data->rx_end = drv_data->rx + transfer->len;
 		drv_data->rx_map_len = 4;
 	} else
 		drv_data->rx_map_len = drv_data->len;
@@ -373,6 +376,7 @@ static int map_dma_buffers(struct driver_data *drv_data)
 	if (drv_data->tx == NULL) {
 		*drv_data->null_dma_buf = 0;
 		drv_data->tx = drv_data->null_dma_buf;
+		drv_data->tx_end = drv_data->tx + transfer->len;
 		drv_data->tx_map_len = 4;
 	} else
 		drv_data->tx_map_len = drv_data->len;
@@ -948,6 +952,12 @@ static void pump_transfers(unsigned long data)
 		giveback(drv_data);
 		return;
 	}
+
+	if (chip->enable_dma)
+		drv_data->len = transfer->len & DCMD_LENGTH;
+	else
+		drv_data->len = transfer->len;
+
 	drv_data->n_bytes = chip->n_bytes;
 	drv_data->dma_width = chip->dma_width;
 	drv_data->tx = (void *)transfer->tx_buf;
@@ -956,7 +966,6 @@ static void pump_transfers(unsigned long data)
 	drv_data->rx_end = drv_data->rx + transfer->len;
 	drv_data->rx_dma = transfer->rx_dma;
 	drv_data->tx_dma = transfer->tx_dma;
-	drv_data->len = transfer->len & DCMD_LENGTH;
 	drv_data->write = drv_data->tx ? chip->write : null_writer;
 	drv_data->read = drv_data->rx ? chip->read : null_reader;
 

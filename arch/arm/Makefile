@@ -20,6 +20,11 @@ GZFLAGS		:=-9
 #KBUILD_CFLAGS	+=-pipe
 # Explicitly specifiy 32-bit ARM ISA since toolchain default can be -mthumb:
 KBUILD_CFLAGS	+=$(call cc-option,-marm,)
+MCOUNT = $(shell echo 'main(){}' | $(CC) -x c -S -o - - -pg | grep mcount | awk '{print $$2}')
+ifeq ("$(MCOUNT)", "__gnu_mcount_nc")
+	KBUILD_CFLAGS   +=-DKBUILD_NEW_GNU_MCOUNT
+	KBUILD_AFLAGS	+=-DKBUILD_NEW_GNU_MCOUNT
+endif
 
 # Do not use arch/arm/defconfig - it's always outdated.
 # Select a platform tht is kept up-to-date

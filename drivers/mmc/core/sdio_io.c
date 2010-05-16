@@ -12,6 +12,7 @@
 #include <linux/mmc/host.h>
 #include <linux/mmc/card.h>
 #include <linux/mmc/sdio.h>
+#include <linux/mmc/sdhci.h>
 #include <linux/mmc/sdio_func.h>
 
 #include "sdio_ops.h"
@@ -324,8 +325,12 @@ static int sdio_io_rw_ext_helper(struct sdio_func *func, int write,
 			ret = mmc_io_rw_extended(func->card, write,
 				func->num, addr, incr_addr, buf,
 				blocks, func->cur_blksize);
-			if (ret)
+			if (ret) {
+#ifdef CONFIG_CPU_PXA168
+				pxa_sdh_startclk(func->card->host);
+#endif
 				return ret;
+			}
 
 			remainder -= size;
 			buf += size;
@@ -340,14 +345,21 @@ static int sdio_io_rw_ext_helper(struct sdio_func *func, int write,
 
 		ret = mmc_io_rw_extended(func->card, write, func->num, addr,
 			 incr_addr, buf, 1, size);
-		if (ret)
+		if (ret) {
+#ifdef CONFIG_CPU_PXA168
+			pxa_sdh_startclk(func->card->host);
+#endif
 			return ret;
+		}
 
 		remainder -= size;
 		buf += size;
 		if (incr_addr)
 			addr += size;
 	}
+#ifdef CONFIG_CPU_PXA168
+	pxa_sdh_startclk(func->card->host);
+#endif
 	return 0;
 }
 
@@ -381,6 +393,41 @@ u8 sdio_readb(struct sdio_func *func, unsigned int addr, int *err_ret)
 	return val;
 }
 EXPORT_SYMBOL_GPL(sdio_readb);
+
+#if 0
+/**
+ *	sdio_readb_ext - read a single byte from a SDIO function
+ *	@func: SDIO function to access
+ *	@addr: address to read
+ *	@err_ret: optional status value from transfer
+ *	@in: value to add to argument
+ *
+ *	Reads a single byte from the address space of a given SDIO
+ *	function. If there is a problem reading the address, 0xff
+ *	is returned and @err_ret will contain the error code.
+ */
+unsigned char sdio_readb_ext(struct sdio_func *func, unsigned int addr,
+	int *err_ret, unsigned in)
+{
+	int ret;
+	unsigned char val;
+
+	BUG_ON(!func);
+
+	if (err_ret)
+		*err_ret = 0;
+
+	ret = mmc_io_rw_direct(func->card, 0, func->num, addr, (u8)in, &val);
+	if (ret) {
+		if (err_ret)
+			*err_ret = ret;
+		return 0xFF;
+	}
+
+	return val;
+}
+EXPORT_SYMBOL_GPL(sdio_readb_ext);
+#endif
 
 /**
  *	sdio_writeb - write a single byte to a SDIO function
@@ -640,6 +687,36 @@ void sdio_f0_writeb(struct sdio_func *func, unsigned char b, unsigned int addr,
 		*err_ret = ret;
 }
 EXPORT_SYMBOL_GPL(sdio_f0_writeb);
+
+
+// this code is used to fix a h/w issue in the 8686 hardware
+// for sdio 1 bit mode to work -- require ECSI to be enabled
+// Enable continuous SPI Interrupt
+
+#warning ECSI HACK FOR 8686
+
+#ifndef SDIO_BUS_ECSI_ENABLED
+#define SDIO_BUS_ECSI_ENABLED	(1<<5)
+#endif
+int sdio_force_ecsi_on_if_1bit_mode(struct sdio_func *func)
+{
+	int ret;
+	unsigned char val;
+
+	ret = mmc_io_rw_direct(func->card, 0, 0, SDIO_CCCR_IF, 0, &val);
+	if (ret)
+		return ret;
+
+	// check if bus width set
+	if ((val & 0x3) == SDIO_BUS_WIDTH_1BIT)
+	{
+		val |= SDIO_BUS_ECSI_ENABLED;
+
+		ret = mmc_io_rw_direct(func->card, 1, 0, SDIO_CCCR_IF, val, NULL);
+	}
+	return ret;
+}
+EXPORT_SYMBOL_GPL(sdio_force_ecsi_on_if_1bit_mode);
 
 /**
  *	sdio_get_host_pm_caps - get host power management capabilities

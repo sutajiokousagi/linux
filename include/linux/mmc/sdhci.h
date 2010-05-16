@@ -48,6 +48,7 @@
 #define  SDHCI_CMD_RESP_SHORT_BUSY 0x03
 
 #define SDHCI_MAKE_CMD(c, f) (((c & 0xff) << 8) | (f & 0xff))
+#define SDHCI_GET_CMD(c) ((c>>8) & 0x3f)
 
 #define SDHCI_RESPONSE		0x10
 
@@ -236,6 +237,12 @@ struct sdhci_host {
 #define SDHCI_QUIRK_DELAY_AFTER_POWER			(1<<23)
 /* Controller uses SDCLK instead of TMCLK for data timeouts */
 #define SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK		(1<<24)
+/* Controller supports high speed but doesn't have the caps bit set */
+#define SDHCI_QUIRK_USE_SUPPLIED_CLOCKS			(1<<25)
+/* Controller needs to do specific reset actions */
+#define SDHCI_QUIRK_PLATORM_RESET			(1<<26)
+/* Controller cannot do High Speed */
+#define SDHCI_QUIRK_BROKEN_HOST_HIGHSPEED		(1<<27)
 
 	int			irq;		/* Device IRQ */
 	void __iomem *		ioaddr;		/* Mapped address */
@@ -294,12 +301,12 @@ struct sdhci_host {
 
 struct sdhci_ops {
 #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
-	u32		(*readl)(struct sdhci_host *host, int reg);
-	u16		(*readw)(struct sdhci_host *host, int reg);
-	u8		(*readb)(struct sdhci_host *host, int reg);
-	void		(*writel)(struct sdhci_host *host, u32 val, int reg);
-	void		(*writew)(struct sdhci_host *host, u16 val, int reg);
-	void		(*writeb)(struct sdhci_host *host, u8 val, int reg);
+	u32		(*sd_readl)(struct sdhci_host *host, int reg);
+	u16		(*sd_readw)(struct sdhci_host *host, int reg);
+	u8		(*sd_readb)(struct sdhci_host *host, int reg);
+	void		(*sd_writel)(struct sdhci_host *host, u32 val, int reg);
+	void		(*sd_writew)(struct sdhci_host *host, u16 val, int reg);
+	void		(*sd_writeb)(struct sdhci_host *host, u8 val, int reg);
 #endif
 
 	void	(*set_clock)(struct sdhci_host *host, unsigned int clock);
@@ -308,54 +315,66 @@ struct sdhci_ops {
 	unsigned int	(*get_max_clock)(struct sdhci_host *host);
 	unsigned int	(*get_min_clock)(struct sdhci_host *host);
 	unsigned int	(*get_timeout_clock)(struct sdhci_host *host);
+
+	unsigned int    (*get_f_max_clock)(struct sdhci_host *host);
+	unsigned int    (*get_f_min_clock)(struct sdhci_host *host);
+	int		(*init)(struct sdhci_host *host, u32 intmask);
+	void		(*platform_specific_reset)(struct sdhci_host *host, u8 mask);
+	void 		(*platform_specific_delay)(struct sdhci_host *host);
+	void 		(*platform_specific_sdio)(struct sdhci_host *host, int enable);
+	int 		(*platform_specific_get_ro)(struct mmc_host *mmc);
+	int		(*platform_supports_8_bit)(struct sdhci_host *host);
+	void		(*platform_set_8_bit)(struct sdhci_host *host);
+	void		(*platform_clear_8_bit)(struct sdhci_host *host);
+	int		(*platform_get_cd)(struct mmc_host *mmc);
 };
 
 #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
 
 static inline void sdhci_writel(struct sdhci_host *host, u32 val, int reg)
 {
-	if (unlikely(host->ops->writel))
-		host->ops->writel(host, val, reg);
+	if (unlikely(host->ops->sd_writel))
+		host->ops->sd_writel(host, val, reg);
 	else
 		writel(val, host->ioaddr + reg);
 }
 
 static inline void sdhci_writew(struct sdhci_host *host, u16 val, int reg)
 {
-	if (unlikely(host->ops->writew))
-		host->ops->writew(host, val, reg);
+	if (unlikely(host->ops->sd_writew))
+		host->ops->sd_writew(host, val, reg);
 	else
 		writew(val, host->ioaddr + reg);
 }
 
 static inline void sdhci_writeb(struct sdhci_host *host, u8 val, int reg)
 {
-	if (unlikely(host->ops->writeb))
-		host->ops->writeb(host, val, reg);
+	if (unlikely(host->ops->sd_writeb))
+		host->ops->sd_writeb(host, val, reg);
 	else
 		writeb(val, host->ioaddr + reg);
 }
 
 static inline u32 sdhci_readl(struct sdhci_host *host, int reg)
 {
-	if (unlikely(host->ops->readl))
-		return host->ops->readl(host, reg);
+	if (unlikely(host->ops->sd_readl))
+		return host->ops->sd_readl(host, reg);
 	else
 		return readl(host->ioaddr + reg);
 }
 
 static inline u16 sdhci_readw(struct sdhci_host *host, int reg)
 {
-	if (unlikely(host->ops->readw))
-		return host->ops->readw(host, reg);
+	if (unlikely(host->ops->sd_readw))
+		return host->ops->sd_readw(host, reg);
 	else
 		return readw(host->ioaddr + reg);
 }
 
 static inline u8 sdhci_readb(struct sdhci_host *host, int reg)
 {
-	if (unlikely(host->ops->readb))
-		return host->ops->readb(host, reg);
+	if (unlikely(host->ops->sd_readb))
+		return host->ops->sd_readb(host, reg);
 	else
 		return readb(host->ioaddr + reg);
 }
@@ -384,12 +403,12 @@ static inline u32 sdhci_readl(struct sdhci_host *host, int reg)
 
 static inline u16 sdhci_readw(struct sdhci_host *host, int reg)
 {
-	return readw(host->ioaddr + reg);
+	return sd_readw(host->ioaddr + reg);
 }
 
 static inline u8 sdhci_readb(struct sdhci_host *host, int reg)
 {
-	return readb(host->ioaddr + reg);
+	return sd_readb(host->ioaddr + reg);
 }
 
 #endif /* CONFIG_MMC_SDHCI_IO_ACCESSORS */
@@ -409,6 +428,10 @@ extern void sdhci_remove_host(struct sdhci_host *host, int dead);
 #ifdef CONFIG_PM
 extern int sdhci_suspend_host(struct sdhci_host *host, pm_message_t state);
 extern int sdhci_resume_host(struct sdhci_host *host);
+#endif
+
+#ifdef CONFIG_CPU_PXA168
+extern void pxa_sdh_startclk(struct mmc_host *mmc);
 #endif
 
 #endif /* __SDHCI_H */

@@ -157,6 +157,14 @@ config GPIO_PCA953X
 	  This driver can also be built as a module.  If so, the module
 	  will be called pca953x.
 
+config GPIO_PCA953X_GENERIC_IRQ
+	bool "Generic IRQ support for PCA953X"
+	depends on GPIO_PCA953X=y && GENERIC_HARDIRQS
+	help
+	  Say yes here to support the Generic IRQ for the PCA953X on-chip
+	  GPIO lines. Only pin-changed IRQs (IRQ_TYPE_EDGE_BOTH) are
+	  supported in hardware.
+
 config GPIO_PCA953X_IRQ
 	bool "Interrupt controller support for PCA953x"
 	depends on GPIO_PCA953X=y
@@ -235,6 +243,17 @@ config GPIO_ADP5588
 	  To compile this driver as a module, choose M here: the module will be
 	  called adp5588-gpio.
 
+config MAX8660
+	boolean "Max8660 chip"
+	depends on I2C && I2C_PXA
+	select PXA3xx_PMIC
+	default n
+	help
+	  Max8660 is a PMIC chip.
+	  If you say yes here, you support for it.
+
+	  This driver can NOT be built as a module.
+
 comment "PCI GPIO expanders:"
 
 config GPIO_CS5535
@@ -291,6 +310,27 @@ config GPIO_MCP23S08
 	  SPI driver for Microchip MCP23S08 I/O expander.  This provides
 	  a GPIO interface supporting inputs and outputs.
 
+config GPIO_PCA9575
+	tristate "PCA9575 I/O ports"
+	depends on I2C
+	help
+	  Say yes here to provide access to several register-oriented
+	  SMBus I/O expanders, made mostly by NXP or TI.  Compatible
+	  models include:
+
+	  16 bits:	pca9575
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called pca9575
+
+config GPIO_PCA9575_GENERIC_IRQ
+	bool "Generic IRQ support for PCA9575"
+	depends on GPIO_PCA9575=y && GENERIC_HARDIRQS
+	help
+	  Say yes here to support the Generic IRQ for the PCA9575 on-chip
+	  GPIO lines. Only pin-changed IRQs (IRQ_TYPE_EDGE_BOTH) are
+	  supported in hardware.
+
 config GPIO_MC33880
 	tristate "Freescale MC33880 high-side/low-side switch"
 	depends on SPI_MASTER
@@ -309,5 +349,6 @@ config GPIO_UCB1400
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called ucb1400_gpio.
+
 
 endif

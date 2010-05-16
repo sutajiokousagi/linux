@@ -35,10 +35,13 @@
 #include <linux/clk.h>
 #include <linux/slab.h>
 
+#include <mach/hardware.h>
+#include <asm/mach-types.h>
 #include <asm/irq.h>
 #include <asm/io.h>
 #include <plat/i2c.h>
 
+#undef CONFIG_PM
 /*
  * I2C register offsets will be shifted 0 or 1 bit left, depending on
  * different SoCs
@@ -54,6 +57,45 @@ static const struct platform_device_id i2c_pxa_id_table[] = {
 };
 MODULE_DEVICE_TABLE(platform, i2c_pxa_id_table);
 
+#if defined(CONFIG_DVFM)
+#include <mach/dvfm.h>
+static int dvfm_dev_idx;
+
+static void set_dvfm_constraint(void)
+{
+	/* Disable Low power mode */
+	dvfm_disable_op_name("apps_idle", dvfm_dev_idx);
+	dvfm_disable_op_name("apps_sleep", dvfm_dev_idx);
+	dvfm_disable_op_name("sys_sleep", dvfm_dev_idx);
+}
+
+static void unset_dvfm_constraint(void)
+{
+	/* Enable Low power mode */
+	dvfm_enable_op_name("apps_idle", dvfm_dev_idx);
+	dvfm_enable_op_name("apps_sleep", dvfm_dev_idx);
+	dvfm_enable_op_name("sys_sleep", dvfm_dev_idx);
+}
+
+static void disable_dvfm(void)
+{
+	dvfm_disable(dvfm_dev_idx);
+}
+
+static void enable_dvfm(void)
+{
+	dvfm_enable(dvfm_dev_idx);
+}
+#else
+static void set_dvfm_constraint(void) {}
+static void unset_dvfm_constraint(void) {}
+static void disable_dvfm(void) {}
+static void enable_dvfm(void) {}
+#endif
+
+#ifdef CONFIG_PM
+int i2c_running = 0;
+#endif
 /*
  * I2C registers and bit definitions
  */
@@ -63,6 +105,8 @@ MODULE_DEVICE_TABLE(platform, i2c_pxa_id_table);
 #define ISR		(0x18)
 #define ISAR		(0x20)
 
+#define SCL		(1 << 1)
+#define SDA		(1 << 0)
 #define ICR_START	(1 << 0)	   /* start bit */
 #define ICR_STOP	(1 << 1)	   /* stop bit */
 #define ICR_ACKNAK	(1 << 2)	   /* send ACK(0) or NAK(1) */
@@ -100,6 +144,7 @@ struct pxa_i2c {
 	unsigned int		msg_idx;
 	unsigned int		msg_ptr;
 	unsigned int		slave_addr;
+	unsigned int		req_slave_addr;
 
 	struct i2c_adapter	adap;
 	struct clk		*clk;
@@ -224,6 +269,7 @@ static irqreturn_t i2c_pxa_handler(int this_irq, void *dev_id);
 
 static void i2c_pxa_scream_blue_murder(struct pxa_i2c *i2c, const char *why)
 {
+#ifdef DEBUG
 	unsigned int i;
 	printk(KERN_ERR "i2c: error: %s\n", why);
 	printk(KERN_ERR "i2c: msg_num: %d msg_idx: %d msg_ptr: %d\n",
@@ -234,6 +280,10 @@ static void i2c_pxa_scream_blue_murder(struct pxa_i2c *i2c, const char *why)
 	for (i = 0; i < i2c->irqlogidx; i++)
 		printk("[%08x:%08x] ", i2c->isrlog[i], i2c->icrlog[i]);
 	printk("\n");
+#else
+	printk("warning: i2c: <%s> slave_0x%x %s\n", i2c->adap.name, 
+			i2c->req_slave_addr >> 1, why);
+#endif
 }
 
 static inline int i2c_pxa_is_slavemode(struct pxa_i2c *i2c)
@@ -288,7 +338,7 @@ static int i2c_pxa_wait_bus_not_busy(struct pxa_i2c *i2c)
 
 static int i2c_pxa_wait_master(struct pxa_i2c *i2c)
 {
-	unsigned long timeout = jiffies + HZ*4;
+	unsigned long timeout = jiffies + msecs_to_jiffies(DEF_TIMEOUT);
 
 	while (time_before(jiffies, timeout)) {
 		if (i2c_debug > 1)
@@ -340,7 +390,7 @@ static int i2c_pxa_set_master(struct pxa_i2c *i2c)
 #ifdef CONFIG_I2C_PXA_SLAVE
 static int i2c_pxa_wait_slave(struct pxa_i2c *i2c)
 {
-	unsigned long timeout = jiffies + HZ*1;
+	unsigned long timeout = jiffies + msecs_to_jiffies(DEF_TIMEOUT);
 
 	/* wait for stop */
 
@@ -594,6 +644,7 @@ static inline void i2c_pxa_start_message(struct pxa_i2c *i2c)
 	 * Step 1: target slave address into IDBR
 	 */
 	writel(i2c_pxa_addr_byte(i2c->msg), _IDBR(i2c));
+	i2c->req_slave_addr = i2c_pxa_addr_byte(i2c->msg);
 
 	/*
 	 * Step 2: initiate the write.
@@ -643,11 +694,14 @@ static int i2c_pxa_pio_set_master(struct pxa_i2c *i2c)
 }
 
 static int i2c_pxa_do_pio_xfer(struct pxa_i2c *i2c,
-			       struct i2c_msg *msg, int num)
+  			       struct i2c_msg *msg, int num,
+  			       struct i2c_pxa_platform_data *plat)
 {
-	unsigned long timeout = 500000; /* 5 seconds */
+	unsigned long timeout = 1000; /* 100 ms */
 	int ret = 0;
+	unsigned long flags;
 
+	local_irq_save(flags);
 	ret = i2c_pxa_pio_set_master(i2c);
 	if (ret)
 		goto out;
@@ -658,14 +712,28 @@ static int i2c_pxa_do_pio_xfer(struct pxa_i2c *i2c,
 	i2c->msg_ptr = 0;
 	i2c->irqlogidx = 0;
 
+	set_dvfm_constraint();
+#ifdef CONFIG_PM
+	i2c_running = 1;
+#endif
 	i2c_pxa_start_message(i2c);
 
 	while (i2c->msg_num > 0 && --timeout) {
 		i2c_pxa_handler(0, i2c);
+		/* send clk to make isp release i2c data line */
+		if(timeout == 0){
+			i2c_pxa_reset(i2c);
+			timeout = 0;
+			goto out;
+		}
 		udelay(10);
 	}
 
 	i2c_pxa_stop_message(i2c);
+	unset_dvfm_constraint();
+#ifdef CONFIG_PM
+	i2c_running = 0;
+#endif
 
 	/*
 	 * We place the return code in i2c->msg_idx.
@@ -673,8 +741,11 @@ static int i2c_pxa_do_pio_xfer(struct pxa_i2c *i2c,
 	ret = i2c->msg_idx;
 
 out:
-	if (timeout == 0)
+	local_irq_restore(flags);
+	if (timeout == 0) {
 		i2c_pxa_scream_blue_murder(i2c, "timeout");
+		ret = -EIO;
+	}
 
 	return ret;
 }
@@ -713,6 +784,10 @@ static int i2c_pxa_do_xfer(struct pxa_i2c *i2c, struct i2c_msg *msg, int num)
 	i2c->msg_ptr = 0;
 	i2c->irqlogidx = 0;
 
+	set_dvfm_constraint();
+#ifdef CONFIG_PM
+	i2c_running = 1;
+#endif
 	i2c_pxa_start_message(i2c);
 
 	spin_unlock_irq(&i2c->lock);
@@ -720,16 +795,23 @@ static int i2c_pxa_do_xfer(struct pxa_i2c *i2c, struct i2c_msg *msg, int num)
 	/*
 	 * The rest of the processing occurs in the interrupt handler.
 	 */
-	timeout = wait_event_timeout(i2c->wait, i2c->msg_num == 0, HZ * 5);
+	timeout = wait_event_timeout(i2c->wait, i2c->msg_num == 0, msecs_to_jiffies(100));
 	i2c_pxa_stop_message(i2c);
-
+	unset_dvfm_constraint();
+#ifdef CONFIG_PM
+	i2c_running = 0;
+#endif
 	/*
 	 * We place the return code in i2c->msg_idx.
 	 */
 	ret = i2c->msg_idx;
 
-	if (timeout == 0)
+	if (timeout == 0) {
+		i2c_pxa_reset(i2c);
 		i2c_pxa_scream_blue_murder(i2c, "timeout");
+		ret = -EIO;
+	}
+
 
  out:
 	return ret;
@@ -739,28 +821,33 @@ static int i2c_pxa_pio_xfer(struct i2c_adapter *adap,
 			    struct i2c_msg msgs[], int num)
 {
 	struct pxa_i2c *i2c = adap->algo_data;
+	struct i2c_pxa_platform_data *plat = adap->dev.parent->platform_data;
 	int ret, i;
-
+	if(plat->get_ripc)
+	plat->get_ripc();
 	/* If the I2C controller is disabled we need to reset it
 	  (probably due to a suspend/resume destroying state). We do
 	  this here as we can then avoid worrying about resuming the
 	  controller before its users. */
-	if (!(readl(_ICR(i2c)) & ICR_IUE))
-		i2c_pxa_reset(i2c);
+	i2c_pxa_reset(i2c);
 
 	for (i = adap->retries; i >= 0; i--) {
-		ret = i2c_pxa_do_pio_xfer(i2c, msgs, num);
+		ret = i2c_pxa_do_pio_xfer(i2c, msgs, num, plat);
 		if (ret != I2C_RETRY)
 			goto out;
-
 		if (i2c_debug)
 			dev_dbg(&adap->dev, "Retrying transmission\n");
+		if (((!(readl(_IBMR(i2c))
+				& SDA )) || (!(readl(_IBMR(i2c)) & SCL))))
+			i2c_pxa_reset(i2c);
 		udelay(100);
 	}
 	i2c_pxa_scream_blue_murder(i2c, "exhausted retries");
 	ret = -EREMOTEIO;
  out:
 	i2c_pxa_set_slave(i2c, ret);
+	if(plat->release_ripc)
+        plat->release_ripc();
 	return ret;
 }
 
@@ -863,6 +950,7 @@ static void i2c_pxa_irq_txempty(struct pxa_i2c *i2c, u32 isr)
 		 * Write the next address.
 		 */
 		writel(i2c_pxa_addr_byte(i2c->msg), _IDBR(i2c));
+		i2c->req_slave_addr = i2c_pxa_addr_byte(i2c->msg);
 
 		/*
 		 * And trigger a repeated start, and send the byte.
@@ -951,7 +1039,7 @@ static irqreturn_t i2c_pxa_handler(int this_irq, void *dev_id)
 		if (isr & ISR_IRF)
 			i2c_pxa_irq_rxfull(i2c, isr);
 	} else {
-		i2c_pxa_scream_blue_murder(i2c, "spurious irq");
+		//i2c_pxa_scream_blue_murder(i2c, "spurious irq");
 	}
 
 	return IRQ_HANDLED;
@@ -961,13 +1049,19 @@ static irqreturn_t i2c_pxa_handler(int this_irq, void *dev_id)
 static int i2c_pxa_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 {
 	struct pxa_i2c *i2c = adap->algo_data;
+	struct i2c_pxa_platform_data *plat = adap->dev.parent->platform_data;
 	int ret, i;
 
+	if (in_atomic() || irqs_disabled())
+		return i2c_pxa_pio_xfer(adap, msgs, num);
+
+	disable_dvfm();
+	if(plat->get_ripc)
+		plat->get_ripc();
 	for (i = adap->retries; i >= 0; i--) {
 		ret = i2c_pxa_do_xfer(i2c, msgs, num);
-		if (ret != I2C_RETRY)
+		if (ret >= 0)
 			goto out;
-
 		if (i2c_debug)
 			dev_dbg(&adap->dev, "Retrying transmission\n");
 		udelay(100);
@@ -976,6 +1070,10 @@ static int i2c_pxa_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num
 	ret = -EREMOTEIO;
  out:
 	i2c_pxa_set_slave(i2c, ret);
+
+	if(plat->release_ripc)
+		plat->release_ripc();
+	enable_dvfm();
 	return ret;
 }
 
@@ -1137,9 +1235,10 @@ static int __exit i2c_pxa_remove(struct platform_device *dev)
 #ifdef CONFIG_PM
 static int i2c_pxa_suspend_noirq(struct device *dev)
 {
-	struct platform_device *pdev = to_platform_device(dev);
-	struct pxa_i2c *i2c = platform_get_drvdata(pdev);
-
+	struct pxa_i2c *i2c = platform_get_drvdata(dev);
+	if (i2c_running == 1) {
+		return 1; /* reject suspend when the i2c doing transaction */
+	}
 	clk_disable(i2c->clk);
 
 	return 0;
@@ -1179,12 +1278,18 @@ static struct platform_driver i2c_pxa_driver = {
 
 static int __init i2c_adap_pxa_init(void)
 {
+#ifdef CONFIG_DVFM
+	dvfm_register("I2C", &dvfm_dev_idx);
+#endif
 	return platform_driver_register(&i2c_pxa_driver);
 }
 
 static void __exit i2c_adap_pxa_exit(void)
 {
 	platform_driver_unregister(&i2c_pxa_driver);
+#ifdef CONFIG_DVFM
+	dvfm_unregister("I2C", &dvfm_dev_idx);
+#endif
 }
 
 MODULE_LICENSE("GPL");

@@ -244,6 +244,11 @@ config INPUT_SGI_BTNS
 	  To compile this driver as a module, choose M here: the
 	  module will be called sgi_btns.
 
+config INPUT_GPIO
+	tristate "GPIO driver support"
+	help
+	  Say Y here if you want to support gpio based keys, wheels etc...
+
 config INPUT_WINBOND_CIR
 	tristate "Winbond IR remote control"
 	depends on X86 && PNP
@@ -276,6 +281,27 @@ config INPUT_PCF50633_PMU
 	help
 	 Say Y to include support for delivering  PMU events via  input
 	 layer on NXP PCF50633.
+
+config INPUT_KEYCHORD
+	tristate "Key chord input driver support"
+	help
+	  Say Y here if you want to enable the key chord driver
+	  accessible at /dev/keychord.  This driver can be used
+	  for receiving notifications when client specified key
+	  combinations are pressed.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called keychord.
+
+config INPUT_SENSOR
+	bool "Sensor input driver support"
+	help
+	  Say Y here if you want to enable the sensor input driver.  
+
+config AVENGERS_LITE_POWER_BUTTON
+	tristate "avengers lite power button"
+	help
+	  Say Y here if you want to support the built-in power button based on avengers lite.
 
 config INPUT_GPIO_ROTARY_ENCODER
 	tristate "Rotary encoders connected to GPIO pins"

@@ -13,11 +13,19 @@
 #define UART1_BASE	(APB_PHYS_BASE + 0x36000)
 #define UART2_BASE	(APB_PHYS_BASE + 0x17000)
 #define UART3_BASE	(APB_PHYS_BASE + 0x18000)
-
-static volatile unsigned long *UART;
+#define UART4_BASE	(APB_PHYS_BASE + 0x26000)
 
 static inline void putc(char c)
 {
+	volatile unsigned long *UART;
+
+	if (machine_is_ipcam())
+		UART = (unsigned long *)UART4_BASE;
+	else if (machine_is_avengers_lite() || machine_is_edge())
+		UART = (unsigned long *)UART3_BASE;
+	else
+		UART = (unsigned long *)UART2_BASE;
+
 	/* UART enabled? */
 	if (!(UART[UART_IER] & UART_IER_UUE))
 		return;
@@ -35,17 +43,8 @@ static inline void flush(void)
 {
 }
 
-static inline void arch_decomp_setup(void)
-{
-	/* default to UART2 */
-	UART = (unsigned long *)UART2_BASE;
-
-	if (machine_is_avengers_lite())
-		UART = (unsigned long *)UART3_BASE;
-}
-
 /*
  * nothing to do
  */
-
+#define arch_decomp_setup()
 #define arch_decomp_wdog()

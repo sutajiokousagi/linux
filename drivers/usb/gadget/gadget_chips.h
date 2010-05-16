@@ -120,10 +120,10 @@
 #define gadget_is_fsl_qe(g)	0
 #endif
 
-#ifdef CONFIG_USB_GADGET_CI13XXX
-#define gadget_is_ci13xxx(g)	(!strcmp("ci13xxx_udc", (g)->name))
+#ifdef CONFIG_USB_GADGET_PXA_U2O
+#define gadget_is_pxau2o(g)	!strcmp("pxa-u2o", (g)->name)
 #else
-#define gadget_is_ci13xxx(g)	0
+#define gadget_is_pxau2o(g)	0
 #endif
 
 // CONFIG_USB_GADGET_SX2
@@ -192,7 +192,7 @@ static inline int usb_gadget_controller_number(struct usb_gadget *gadget)
 		return 0x21;
 	else if (gadget_is_fsl_qe(gadget))
 		return 0x22;
-	else if (gadget_is_ci13xxx(gadget))
+	else if (gadget_is_pxau2o(gadget))
 		return 0x23;
 	else if (gadget_is_langwell(gadget))
 		return 0x24;

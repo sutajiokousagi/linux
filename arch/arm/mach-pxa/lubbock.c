@@ -25,7 +25,7 @@
 
 #include <linux/spi/spi.h>
 #include <linux/spi/ads7846.h>
-#include <mach/pxa2xx_spi.h>
+#include <plat/pxa2xx_spi.h>
 
 #include <asm/setup.h>
 #include <asm/memory.h>

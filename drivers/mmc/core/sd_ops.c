@@ -254,6 +254,7 @@ int mmc_app_send_scr(struct mmc_card *card, u32 *scr)
 	struct mmc_command cmd;
 	struct mmc_data data;
 	struct scatterlist sg;
+	u32 temp[2];
 
 	BUG_ON(!card);
 	BUG_ON(!card->host);
@@ -282,7 +283,7 @@ int mmc_app_send_scr(struct mmc_card *card, u32 *scr)
 	data.sg = &sg;
 	data.sg_len = 1;
 
-	sg_init_one(&sg, scr, 8);
+	sg_init_one(&sg, temp, 8);
 
 	mmc_set_data_timeout(&data, card);
 
@@ -293,8 +294,8 @@ int mmc_app_send_scr(struct mmc_card *card, u32 *scr)
 	if (data.error)
 		return data.error;
 
-	scr[0] = be32_to_cpu(scr[0]);
-	scr[1] = be32_to_cpu(scr[1]);
+	scr[0] = be32_to_cpu(temp[0]);
+	scr[1] = be32_to_cpu(temp[1]);
 
 	return 0;
 }

@@ -316,6 +316,22 @@ config ELECTRA_CF
 	  Say Y here to support the CompactFlash controller on the
 	  PA Semi Electra eval board.
 
+config PXA168_CF
+	tristate "PXA168 On-Chip CompactFlash Controller"
+	depends on PCMCIA && CPU_PXA168
+	select PXA168_CF_USE_GPIO_CARDDETECT
+	help
+	  Say Y here to support the CompactFlash controller on PXA168 platforms.
+	  Or choose M to compile the driver as a module named "pxa168_cf".
+
+config PXA168_CF_USE_GPIO_CARDDETECT
+	tristate "Use Card Detect MFP's as GPIO for card detection"
+	depends on PXA168_CF
+	default y
+	help
+	  Say Y here to use CompactFlash Card Detect MFP's as a GPIO to detect
+	  card insertion/removal
+
 config PCCARD_NONSTATIC
 	tristate
 

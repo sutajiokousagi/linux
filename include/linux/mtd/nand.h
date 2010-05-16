@@ -169,6 +169,8 @@ typedef enum {
 #define NAND_NO_READRDY		0x00000100
 /* Chip does not allow subpage writes */
 #define NAND_NO_SUBPAGE_WRITE	0x00000200
+/* If use marvell bbm scheme, mtd should report no error to the up level */
+#define BBT_RELOCATION_IFBAD    0x00000400
 
 /* Options valid for Samsung large page devices */
 #define NAND_SAMSUNG_LP_OPTIONS \
@@ -358,6 +360,7 @@ struct nand_chip {
 	void  __iomem	*IO_ADDR_R;
 	void  __iomem	*IO_ADDR_W;
 
+	int		(*scan_ident)(struct mtd_info *mtd, int maxchips);
 	uint8_t		(*read_byte)(struct mtd_info *mtd);
 	u16		(*read_word)(struct mtd_info *mtd);
 	void		(*write_buf)(struct mtd_info *mtd, const uint8_t *buf, int len);
@@ -373,6 +376,7 @@ struct nand_chip {
 	int		(*waitfunc)(struct mtd_info *mtd, struct nand_chip *this);
 	void		(*erase_cmd)(struct mtd_info *mtd, int page);
 	int		(*scan_bbt)(struct mtd_info *mtd);
+	int		(*update_bbt)(struct mtd_info *mtd, loff_t offs);
 	int		(*errstat)(struct mtd_info *mtd, struct nand_chip *this, int state, int status, int page);
 	int		(*write_page)(struct mtd_info *mtd, struct nand_chip *chip,
 				      const uint8_t *buf, int page, int cached, int raw);

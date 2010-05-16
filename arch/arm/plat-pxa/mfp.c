@@ -20,6 +20,7 @@
 #include <linux/sysdev.h>
 
 #include <plat/mfp.h>
+#include <mach/cputype.h>
 
 #define MFPR_SIZE	(PAGE_SIZE)
 
@@ -141,7 +142,7 @@ static const unsigned long mfpr_edge[] = {
  * perform a read-back of any MFPR register to make sure the
  * previous writings are finished
  */
-#define mfpr_sync()	(void)__raw_readl(mfpr_mmio_base + 0)
+#define mfpr_sync()	(void)__raw_readl(mfpr_mmio_base + 0x0204)
 
 static inline void __mfp_config_run(struct mfp_pin *p)
 {
@@ -196,12 +197,25 @@ void mfp_config(unsigned long *mfp_cfgs, int num)
 			p->mfpr_run = tmp | mfpr_pull[pull];
 		}
 
+		/*
+		 * pxa168 fast IO pins drive strength handled by
+		 * pxa168_mfp_fastio_drive(), skip settings here
+		 */
+		if (cpu_is_pxa168()) {
+			if ((pin >= 56) && (pin <= 85)) {
+				p->mfpr_run = (mfpr_readl(mfp_table[pin].mfpr_off) & (3<<10)) |
+					(p->mfpr_run & ~(3 << 10));
+			}
+			/* bit7 set always */
+			p->mfpr_run |= (1<<7);
+		}
 		p->config = c; __mfp_config_run(p);
 	}
 
 	mfpr_sync();
 	spin_unlock_irqrestore(&mfp_spin_lock, flags);
 }
+EXPORT_SYMBOL(mfp_config);
 
 unsigned long mfp_read(int mfp)
 {
@@ -226,6 +240,22 @@ void mfp_write(int mfp, unsigned long val)
 	mfpr_writel(mfp_table[mfp].mfpr_off, val);
 	mfpr_sync();
 	spin_unlock_irqrestore(&mfp_spin_lock, flags);
+}
+
+void mfp_set(int mfp, unsigned long mask)
+{
+	unsigned long tmp = mfp_read(mfp);
+
+	tmp |= mask;
+	mfp_write(mfp, tmp);
+}
+
+void mfp_clr(int mfp, unsigned long mask)
+{
+	unsigned long tmp = mfp_read(mfp);
+
+	tmp &= ~mask;
+	mfp_write(mfp, tmp);
 }
 
 void __init mfp_init_base(unsigned long mfpr_base)

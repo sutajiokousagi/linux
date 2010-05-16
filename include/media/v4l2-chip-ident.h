@@ -59,6 +59,7 @@ enum {
 
 	/* OmniVision sensors: reserved range 250-299 */
 	V4L2_IDENT_OV7670 = 250,
+
 	V4L2_IDENT_OV7720 = 251,
 	V4L2_IDENT_OV7725 = 252,
 	V4L2_IDENT_OV7660 = 253,
@@ -66,9 +67,14 @@ enum {
 	V4L2_IDENT_OV9655 = 255,
 	V4L2_IDENT_SOI968 = 256,
 	V4L2_IDENT_OV9640 = 257,
+        V4L2_IDENT_OV3640 = 258,
+	V4L2_IDENT_OV7740 = 259,
 
 	/* module saa7146: reserved range 300-309 */
 	V4L2_IDENT_SAA7146 = 300,
+
+	/* NiceSeti sensors: reserved range 310-349  */
+	V4L2_IDENT_SIV120A = 310,
 
 	/* Conexant MPEG encoder/decoders: reserved range 400-420 */
 	V4L2_IDENT_CX23418_843 = 403, /* Integrated A/V Decoder on the '418 */
@@ -281,6 +287,8 @@ enum {
 
 	/* HV7131R CMOS sensor: just ident 46000 */
 	V4L2_IDENT_HV7131R		= 46000,
+
+	V4L2_IDENT_CLI5001		= 46001, /* cli5001 camera ISP chips */
 
 	/* module cs53132a: just ident 53132 */
 	V4L2_IDENT_CS53l32A = 53132,

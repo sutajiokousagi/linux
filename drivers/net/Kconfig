@@ -920,6 +920,12 @@ config SMC91X
 	  The module will be called smc91x.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/kbuild/modules.txt>.
 
+config PXA168_ETH
+	tristate "Marvell pxa168 ethernet support"
+	select MII
+	help
+	  This driver supports the pxa168 ethernet
+
 config NET_NETX
 	tristate "NetX Ethernet support"
 	select MII
@@ -3190,6 +3196,23 @@ config PPPOL2TP
 	  userland daemon handles L2TP the control protocol (tunnel
 	  and session setup). One such daemon is OpenL2TP
 	  (http://openl2tp.sourceforge.net/).
+
+config PPPOLAC
+	tristate "PPP on L2TP Access Concentrator"
+	depends on PPP && INET
+	help
+	  L2TP (RFC 2661) is a tunneling protocol widely used in virtual private
+	  networks. This driver handles L2TP data packets between a UDP socket
+	  and a PPP channel, but only permits one session per socket. Thus it is
+	  fairly simple and suited for clients.
+
+config PPPOPNS
+	tristate "PPP on PPTP Network Server"
+	depends on PPP && INET
+	help
+	  PPTP (RFC 2637) is a tunneling protocol widely used in virtual private
+	  networks. This driver handles PPTP data packets between a RAW socket
+	  and a PPP channel. It is fairly simple and easy to use.
 
 config SLIP
 	tristate "SLIP (serial line) support"

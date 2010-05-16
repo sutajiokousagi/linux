@@ -6295,7 +6295,9 @@ int ata_host_activate(struct ata_host *host, int irq,
 
 	/* Special case for polling mode */
 	if (!irq) {
+#ifndef CONFIG_PXA168_CF
 		WARN_ON(irq_handler);
+#endif
 		return ata_host_register(host, sht);
 	}
 

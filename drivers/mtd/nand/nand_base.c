@@ -370,7 +370,7 @@ static int nand_default_block_markbad(struct mtd_info *mtd, loff_t ofs)
 
 	/* Do we have a flash based bad block table ? */
 	if (chip->options & NAND_USE_FLASH_BBT)
-		ret = nand_update_bbt(mtd, ofs);
+		ret = chip->update_bbt(mtd, ofs);
 	else {
 		/* We write two bytes, so we dont have to mess with 16 bit
 		 * access
@@ -2429,6 +2429,12 @@ int nand_erase_nand(struct mtd_info *mtd, struct erase_info *instr,
 
 	/* Deselect and wake up anyone waiting on the device */
 	nand_release_device(mtd);
+	if (ret && (chip->options & BBT_RELOCATION_IFBAD)) {
+		chip->block_markbad(mtd,
+			(loff_t)(page & chip->pagemask) << chip->page_shift);
+		instr->state = MTD_ERASE_DONE;
+		ret = 0;
+	}
 
 	/* Do call back function */
 	if (!ret)
@@ -2445,10 +2451,10 @@ int nand_erase_nand(struct mtd_info *mtd, struct erase_info *instr,
 		if (!rewrite_bbt[chipnr])
 			continue;
 		/* update the BBT for chip */
-		DEBUG(MTD_DEBUG_LEVEL0, "%s: nand_update_bbt "
-			"(%d:0x%0llx 0x%0x)\n", __func__, chipnr,
-			rewrite_bbt[chipnr], chip->bbt_td->pages[chipnr]);
-		nand_update_bbt(mtd, rewrite_bbt[chipnr]);
+		DEBUG(MTD_DEBUG_LEVEL0, "nand_erase_nand: nand_update_bbt "
+		      "(%d:0x%0llx 0x%0x)\n", chipnr, rewrite_bbt[chipnr],
+		      chip->bbt_td->pages[chipnr]);
+		chip->update_bbt(mtd, rewrite_bbt[chipnr]);
 	}
 
 	/* Return more or less happy */
@@ -2550,6 +2556,8 @@ static void nand_set_defaults(struct nand_chip *chip, int busw)
 	if (chip->waitfunc == NULL)
 		chip->waitfunc = nand_wait;
 
+	if (!chip->scan_ident)
+		chip->scan_ident = nand_scan_ident;
 	if (!chip->select_chip)
 		chip->select_chip = nand_select_chip;
 	if (!chip->read_byte)
@@ -2568,6 +2576,8 @@ static void nand_set_defaults(struct nand_chip *chip, int busw)
 		chip->verify_buf = busw ? nand_verify_buf16 : nand_verify_buf;
 	if (!chip->scan_bbt)
 		chip->scan_bbt = nand_default_bbt;
+	if (!chip->update_bbt)
+		chip->update_bbt = nand_update_bbt;
 
 	if (!chip->controller) {
 		chip->controller = &chip->hwcontrol;
@@ -2755,8 +2765,6 @@ int nand_scan_ident(struct mtd_info *mtd, int maxchips)
 
 	/* Get buswidth to select the correct functions */
 	busw = chip->options & NAND_BUSWIDTH_16;
-	/* Set the default functions */
-	nand_set_defaults(chip, busw);
 
 	/* Read the flash type */
 	type = nand_get_flash_type(mtd, chip, busw, &nand_maf_id);
@@ -3041,7 +3049,8 @@ int nand_scan_tail(struct mtd_info *mtd)
  */
 int nand_scan(struct mtd_info *mtd, int maxchips)
 {
-	int ret;
+	struct nand_chip *chip = mtd->priv;
+	int ret, busw;
 
 	/* Many callers got this wrong, so check for it for a while... */
 	if (!mtd->owner && caller_is_module()) {
@@ -3050,7 +3059,12 @@ int nand_scan(struct mtd_info *mtd, int maxchips)
 		BUG();
 	}
 
-	ret = nand_scan_ident(mtd, maxchips);
+	/* Get buswidth to select the correct functions */
+	busw = chip->options & NAND_BUSWIDTH_16;
+	/* Set the default functions */
+	nand_set_defaults(chip, busw);
+
+	ret = chip->scan_ident(mtd, maxchips);
 	if (!ret)
 		ret = nand_scan_tail(mtd);
 	return ret;

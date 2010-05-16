@@ -11,4 +11,9 @@
 
 #define PHYS_OFFSET	UL(0x00000000)
 
+#if defined(CONFIG_CPU_L2_CACHE)
+#define NET_IP_ALIGN 64
+#define ARCH_DMA_CACHE_ALIGNMENT 64
+#endif
+
 #endif /* __ASM_MACH_MEMORY_H */

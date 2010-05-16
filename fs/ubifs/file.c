@@ -52,6 +52,7 @@
 #include "ubifs.h"
 #include <linux/mount.h>
 #include <linux/namei.h>
+#include <linux/dma-mapping.h>
 #include <linux/slab.h>
 
 static int read_block(struct inode *inode, void *addr, unsigned int block,

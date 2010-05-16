@@ -32,8 +32,8 @@
 
 #include <asm/irq.h>
 #include <mach/hardware.h>
-#include <mach/ssp.h>
-#include <mach/regs-ssp.h>
+#include <plat/ssp.h>
+#include <plat/regs-ssp.h>
 
 #ifdef CONFIG_PXA_SSP_LEGACY
 
@@ -79,8 +79,8 @@ int ssp_write_word(struct ssp_dev *dev, u32 data)
 	int timeout = TIMEOUT;
 
 	while (!(__raw_readl(ssp->mmio_base + SSSR) & SSSR_TNF)) {
-	        if (!--timeout)
-	        	return -ETIMEDOUT;
+		if (!--timeout)
+			return -ETIMEDOUT;
 		cpu_relax();
 	}
 
@@ -110,8 +110,8 @@ int ssp_read_word(struct ssp_dev *dev, u32 *data)
 	int timeout = TIMEOUT;
 
 	while (!(__raw_readl(ssp->mmio_base + SSSR) & SSSR_RNE)) {
-	        if (!--timeout)
-	        	return -ETIMEDOUT;
+		if (!--timeout)
+			return -ETIMEDOUT;
 		cpu_relax();
 	}
 
@@ -144,12 +144,12 @@ int ssp_flush(struct ssp_dev *dev)
 
 	do {
 		while (__raw_readl(ssp->mmio_base + SSSR) & SSSR_RNE) {
-		        if (!--timeout)
-		        	return -ETIMEDOUT;
+			if (!--timeout)
+				return -ETIMEDOUT;
 			(void)__raw_readl(ssp->mmio_base + SSDR);
 		}
-	        if (!--timeout)
-	        	return -ETIMEDOUT;
+		if (!--timeout)
+			return -ETIMEDOUT;
 	} while (__raw_readl(ssp->mmio_base + SSSR) & SSSR_BSY);
 
 	return 0;
@@ -275,7 +275,7 @@ int ssp_init(struct ssp_dev *dev, u32 port, u32 init_flags)
 	if (!(init_flags & SSP_NO_IRQ)) {
 		ret = request_irq(ssp->irq, ssp_interrupt,
 				0, "SSP", dev);
-	    	if (ret)
+		if (ret)
 			goto out_region;
 		dev->irq = ssp->irq;
 	} else
@@ -345,9 +345,8 @@ void ssp_free(struct ssp_device *ssp)
 }
 EXPORT_SYMBOL(ssp_free);
 
-static int __devinit ssp_probe(struct platform_device *pdev)
+static int __devinit ssp_probe(struct platform_device *pdev, int type)
 {
-	const struct platform_device_id *id = platform_get_device_id(pdev);
 	struct resource *res;
 	struct ssp_device *ssp;
 	int ret = 0;
@@ -359,7 +358,7 @@ static int __devinit ssp_probe(struct platform_device *pdev)
 	}
 	ssp->pdev = pdev;
 
-	ssp->clk = clk_get(&pdev->dev, NULL);
+	ssp->clk = clk_get(&pdev->dev, "SSPCLK");
 	if (IS_ERR(ssp->clk)) {
 		ret = PTR_ERR(ssp->clk);
 		goto err_free;
@@ -417,7 +416,7 @@ static int __devinit ssp_probe(struct platform_device *pdev)
 	 */
 	ssp->port_id = pdev->id + 1;
 	ssp->use_count = 0;
-	ssp->type = (int)id->driver_data;
+	ssp->type = type; 
 
 	mutex_lock(&ssp_lock);
 	list_add(&ssp->node, &ssp_list);
@@ -461,31 +460,96 @@ static int __devexit ssp_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static const struct platform_device_id ssp_id_table[] = {
-	{ "pxa25x-ssp",		PXA25x_SSP },
-	{ "pxa25x-nssp",	PXA25x_NSSP },
-	{ "pxa27x-ssp",		PXA27x_SSP },
-	{ },
+static int __devinit pxa25x_ssp_probe(struct platform_device *pdev)
+{
+	return ssp_probe(pdev, PXA25x_SSP);
+}
+
+static int __devinit pxa25x_nssp_probe(struct platform_device *pdev)
+{
+	return ssp_probe(pdev, PXA25x_NSSP);
+}
+
+static int __devinit pxa27x_ssp_probe(struct platform_device *pdev)
+{
+	return ssp_probe(pdev, PXA27x_SSP);
+}
+
+static int __devinit pxa168_ssp_probe(struct platform_device *pdev)
+{
+	return ssp_probe(pdev, PXA168_SSP);
+}
+
+static struct platform_driver pxa25x_ssp_driver = {
+	.driver		= {
+		.name	= "pxa25x-ssp",
+	},
+	.probe		= pxa25x_ssp_probe,
+	.remove		= __devexit_p(ssp_remove),
 };
 
-static struct platform_driver ssp_driver = {
-	.probe		= ssp_probe,
-	.remove		= __devexit_p(ssp_remove),
-	.driver		= {
-		.owner	= THIS_MODULE,
-		.name	= "pxa2xx-ssp",
+static struct platform_driver pxa25x_nssp_driver = {
+	.driver         = {
+		.name   = "pxa25x-nssp",
 	},
-	.id_table	= ssp_id_table,
+	.probe          = pxa25x_nssp_probe,
+	.remove         = __devexit_p(ssp_remove),
+};
+
+static struct platform_driver pxa27x_ssp_driver = {
+	.driver         = {
+		.name   = "pxa27x-ssp",
+	},
+	.probe          = pxa27x_ssp_probe,
+	.remove         = __devexit_p(ssp_remove),
+};
+
+static struct platform_driver pxa168_ssp_driver = {
+	.driver		= {
+		.name	= "pxa168-ssp",
+	},
+	.probe		= pxa168_ssp_probe,
+	.remove		= __devexit_p(ssp_remove),
 };
 
 static int __init pxa_ssp_init(void)
 {
-	return platform_driver_register(&ssp_driver);
+	int ret = 0;
+
+	ret = platform_driver_register(&pxa25x_ssp_driver);
+	if (ret) {
+		printk(KERN_ERR "failed to register pxa25x_ssp_driver");
+		return ret;
+	}
+
+	ret = platform_driver_register(&pxa25x_nssp_driver);
+	if (ret) {
+		printk(KERN_ERR "failed to register pxa25x_nssp_driver");
+		return ret;
+	}
+
+	ret = platform_driver_register(&pxa27x_ssp_driver);
+	if (ret) {
+		printk(KERN_ERR "failed to register pxa27x_ssp_driver");
+		return ret;
+	}
+
+	printk(KERN_ERR "platform_driver_register\n");
+	ret = platform_driver_register(&pxa168_ssp_driver);
+	if (ret) {
+		printk(KERN_ERR "failed to register pxa168_ssp_driver");
+		return ret;
+	}
+
+	return ret;
 }
 
 static void __exit pxa_ssp_exit(void)
 {
-	platform_driver_unregister(&ssp_driver);
+	platform_driver_unregister(&pxa25x_ssp_driver);
+	platform_driver_unregister(&pxa25x_nssp_driver);
+	platform_driver_unregister(&pxa27x_ssp_driver);
+	platform_driver_unregister(&pxa168_ssp_driver);
 }
 
 arch_initcall(pxa_ssp_init);

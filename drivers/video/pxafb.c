@@ -87,6 +87,8 @@ static int setup_frame_dma(struct pxafb_info *fbi, int dma, int pal,
 
 static unsigned long video_mem_size = 0;
 
+static unsigned long video_mem_size = 0;
+
 static inline unsigned long
 lcd_readl(struct pxafb_info *fbi, unsigned int off)
 {
@@ -1681,14 +1683,13 @@ static int __devinit pxafb_init_video_memory(struct pxafb_info *fbi)
 	fbi->video_mem = alloc_pages_exact(size, GFP_KERNEL | __GFP_ZERO);
 	if (fbi->video_mem == NULL)
 		return -ENOMEM;
-
 	fbi->video_mem_phys = virt_to_phys(fbi->video_mem);
 	fbi->video_mem_size = size;
 
 	fbi->fb.fix.smem_start	= fbi->video_mem_phys;
 	fbi->fb.fix.smem_len	= fbi->video_mem_size;
 	fbi->fb.screen_base	= fbi->video_mem;
-
+	}
 	return fbi->video_mem ? 0 : -ENOMEM;
 }
 

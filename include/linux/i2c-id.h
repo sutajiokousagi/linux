@@ -55,5 +55,6 @@
 /* --- Miscellaneous adapters */
 #define I2C_HW_SAA7146		0x060000 /* SAA7146 video decoder bus */
 #define I2C_HW_SAA7134		0x090000 /* SAA7134 video decoder bus */
+#define I2C_DRIVERID_CLI5001 1022	/* CLI5001 camera ISP */
 
 #endif /* LINUX_I2C_ID_H */

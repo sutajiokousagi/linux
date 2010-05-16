@@ -88,6 +88,19 @@ config VT_HW_CONSOLE_BINDING
 	 information. For framebuffer console users, please refer to
 	 <file:Documentation/fb/fbcon.txt>.
 
+config DEVMEM
+	bool "Memory device driver"
+	default y
+	help
+	  The memory driver provides two character devices, mem and kmem, which
+	  provide access to the system's memory. The mem device is a view of
+	  physical memory, and each byte in the device corresponds to the
+	  matching physical address. The kmem device is the same as mem, but
+	  the addresses correspond to the kernel's virtual address space rather
+	  than physical memory. These devices are standard parts of a Linux
+	  system and most users should say Y here. You might say N if very
+	  security conscience or memory is tight.
+
 config DEVKMEM
 	bool "/dev/kmem virtual device support"
 	default y
@@ -1111,7 +1124,31 @@ config DEVPORT
 	depends on ISA || PCI
 	default y
 
+config DCC_TTY
+	tristate "DCC tty driver"
+	depends on ARM
+
 source "drivers/s390/char/Kconfig"
+
+config PXA930_ACIPC
+        tristate "PXA930 AC-IPC Driver"
+        depends on CPU_PXA930 || CPU_PXA910
+        help
+          Please say Y here if want to support Application to Communication
+          Intel-Processor Communication on PXA930 chip
+
+config PXA910_IRE
+        tristate "image rotation engine"
+        depends on CPU_PXA910
+        help
+          Please say Y here if want to support image rotation engine
+
+source "drivers/char/icr/Kconfig"
+
+config PXA_CNM
+        tristate "chip and media codaDx8 codec driver"
+        help
+          Please say Y here if want to support chip and media codec
 
 endmenu
 

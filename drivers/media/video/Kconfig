@@ -309,12 +309,42 @@ config VIDEO_KS0127
 	  To compile this driver as a module, choose M here: the
 	  module will be called ks0127.
 
+config VIDEO_OV3640
+        tristate "OmniVision OV3640 sensor support"
+        depends on I2C && VIDEO_V4L2
+        ---help---
+          Support for the OmniVision OV3640 QXGA camera.
+
 config VIDEO_OV7670
 	tristate "OmniVision OV7670 sensor support"
 	depends on I2C && VIDEO_V4L2
 	---help---
 	  This is a Video4Linux2 sensor-level driver for the OmniVision
 	  OV7670 VGA camera.  It currently only works with the M88ALP01
+	  controller.
+
+config VIDEO_OV7660
+        tristate "OmniVision OV7660 sensor support"
+        depends on I2C && VIDEO_V4L2
+        ---help---
+          This is a Video4Linux2 sensor-level driver for the OmniVision
+          OV7660 VGA camera.  It currently only works with the M88ALP01
+          controller.
+
+config VIDEO_SIV120A
+	tristate "SETI SIV120A sensor support"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This is a Video4Linux2 sensor-level driver for the Nice Seti
+	  SIV120A VGA camera.  It currently only works with the PXA168 camera
+	  controller.
+
+config VIDEO_OV7740
+	tristate "OmniVision OV7740 sensor support"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This is a Video4Linux2 sensor-level driver for the OmniVision
+	  OV7740 VGA camera.  It currently only works with the M88ALP01
 	  controller.
 
 config VIDEO_MT9V011
@@ -1106,4 +1136,29 @@ config USB_S2255
 	  This driver can be compiled as a module, called s2255drv.
 
 endif # V4L_USB_DRIVERS
+
+config PXA168_CAMERA
+        tristate "Marvell PXA168 Camera Controller support"
+        depends on I2C && VIDEO_V4L2
+        ---help---
+          This is a video4linux2 driver for the Marvell PXA168 camera
+          controller.
+
+config CLI5001_ISP
+        tristate "CLI5001 Camera ISP support"
+        depends on I2C && VIDEO_V4L2
+        ---help---
+          This is a video4linux2 driver for the CLI5001 camera ISP
+          controller.
+
+config VIDEO_OV529
+	tristate "OmniVision OV529 Encoder support"
+	depends on MACH_IPCAM && VIDEO_OV7740
+	---help---
+	  This is a driver for the OmniVision OV529 encoder with Video4Linux2
+	  interface. It currently only works with IPCAM platform and ov7740
+	  sensor.
+
+source "drivers/media/video/cmmb/Kconfig"
+
 endif # VIDEO_CAPTURE_DRIVERS

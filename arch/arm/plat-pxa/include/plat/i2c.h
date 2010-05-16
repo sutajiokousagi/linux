@@ -67,6 +67,8 @@ struct i2c_pxa_platform_data {
 	unsigned int		class;
 	unsigned int		use_pio :1;
 	unsigned int		fast_mode :1;
+	void (*get_ripc) (void);
+	void (*release_ripc) (void);
 };
 
 extern void pxa_set_i2c_info(struct i2c_pxa_platform_data *info);

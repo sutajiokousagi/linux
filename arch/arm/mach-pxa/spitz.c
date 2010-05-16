@@ -42,7 +42,7 @@
 #include <mach/mmc.h>
 #include <mach/ohci.h>
 #include <mach/pxafb.h>
-#include <mach/pxa2xx_spi.h>
+#include <plat/pxa2xx_spi.h>
 #include <mach/spitz.h>
 
 #include "generic.h"

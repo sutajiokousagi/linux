@@ -1,9 +1,11 @@
 /*
- *  linux/arch/arm/mm/proc-mohawk.S: MMU functions for Marvell PJ1 core
+ *  linux/arch/arm/mm/proc-mohawk.S: MMU functions for ARM926EJ-S
  *
- *  PJ1 (codename Mohawk) is a hybrid of the xscale3 and Marvell's own core.
- *
- *  Heavily based on proc-arm926.S and proc-xsc3.S
+ *  Copyright (C) 1999-2001 ARM Limited
+ *  Copyright (C) 2000 Deep Blue Solutions Ltd.
+ *  hacked for non-paged-MM by Hyok S. Choi, 2003.
+ *  Copyright (C) 2008 Marvell International - L2 cache support by
+ *                         Jason Chagas <jason.chagas@marvell.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,6 +20,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ *
+ * These are the low level assembler for performing cache and TLB
+ * functions on the mohawk.
+ *
+ *  CONFIG_CPU_ARM926_CPU_IDLE -> nohlt
  */
 
 #include <linux/linkage.h>
@@ -31,16 +39,31 @@
 #include "proc-macros.S"
 
 /*
- * This is the maximum size of an area which will be flushed.  If the
- * area is larger than this, then we flush the whole cache.
+ * This is the maximum size of an area which will be invalidated
+ * using the single invalidate entry instructions.  Anything larger
+ * than this, and we go for the whole cache.
+ *
+ * This value should be chosen such that we choose the cheapest
+ * alternative.
  */
-#define CACHE_DLIMIT	32768
+#define CACHE_DLIMIT	16384
 
 /*
- * The cache line size of the L1 D cache.
+ * the cache line size of the I and D cache
  */
 #define CACHE_DLINESIZE	32
 
+#if !defined(CONFIG_CPU_PXA168_B0)
+#define BAD_CACHE_LINE_OFFSET	(PAGE_SZ - CACHE_DLINESIZE)
+#endif
+
+/*
+ * Run with L2 enabled.
+ */
+#undef TTC_Z0_SUPPORT
+/* #define L2_CACHE_PREFETCH_DISABLE */
+
+	.text
 /*
  * cpu_mohawk_proc_init()
  */
@@ -56,8 +79,8 @@ ENTRY(cpu_mohawk_proc_fin)
 	msr	cpsr_c, ip
 	bl	mohawk_flush_kern_cache_all
 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
-	bic	r0, r0, #0x1800			@ ...iz...........
-	bic	r0, r0, #0x0006			@ .............ca.
+	bic	r0, r0, #0x1000			@ ...i............
+	bic	r0, r0, #0x000e			@ ............wca.
 	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
 	ldmfd	sp!, {pc}
 
@@ -69,19 +92,18 @@ ENTRY(cpu_mohawk_proc_fin)
  * to what would be the reset vector.
  *
  * loc: location to jump to for soft reset
- *
- * (same as arm926)
  */
 	.align	5
 ENTRY(cpu_mohawk_reset)
 	mov	ip, #0
 	mcr	p15, 0, ip, c7, c7, 0		@ invalidate I,D caches
 	mcr	p15, 0, ip, c7, c10, 4		@ drain WB
+#ifdef CONFIG_MMU
 	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I & D TLBs
-	mrc	p15, 0, ip, c1, c0, 0		@ ctrl register
-	bic	ip, ip, #0x0007			@ .............cam
-	bic	ip, ip, #0x1100			@ ...i...s........
+#endif
+	ldr	ip, =0x5087a
 	mcr	p15, 0, ip, c1, c0, 0		@ ctrl register
+	mrc	p15, 0, ip, c1, c0, 0		@ ctrl register
 	mov	pc, r0
 
 /*
@@ -89,11 +111,12 @@ ENTRY(cpu_mohawk_reset)
  *
  * Called with IRQs disabled
  */
-	.align	5
+	.align	10
 ENTRY(cpu_mohawk_do_idle)
 	mov	r0, #0
-	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
-	mcr	p15, 0, r0, c7, c0, 4		@ wait for interrupt
+#ifdef CONFIG_ENABLE_COREIDLE
+	mcr	p15, 0, r0, c7, c0, 4		@ Wait for interrupt
+#endif
 	mov	pc, lr
 
 /*
@@ -114,10 +137,15 @@ ENTRY(mohawk_flush_kern_cache_all)
 	mov	r2, #VM_EXEC
 	mov	ip, #0
 __flush_whole_cache:
-	mcr	p15, 0, ip, c7, c14, 0		@ clean & invalidate all D cache
+#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
+	mcr	p15, 0, ip, c7, c6, 0		@ invalidate D cache
+#else
+1:	mrc	p15, 0, r15, c7, c14, 3 	@ test,clean,invalidate
+	bne	1b
+#endif
 	tst	r2, #VM_EXEC
 	mcrne	p15, 0, ip, c7, c5, 0		@ invalidate I cache
-	mcrne	p15, 0, ip, c7, c10, 0		@ drain write buffer
+	mcrne	p15, 0, ip, c7, c10, 4		@ drain WB
 	mov	pc, lr
 
 /*
@@ -129,8 +157,6 @@ __flush_whole_cache:
  *	- start	- start address (inclusive)
  *	- end	- end address (exclusive)
  *	- flags	- vm_flags describing address space
- *
- * (same as arm926)
  */
 ENTRY(mohawk_flush_user_cache_range)
 	mov	ip, #0
@@ -138,12 +164,21 @@ ENTRY(mohawk_flush_user_cache_range)
 	cmp	r3, #CACHE_DLIMIT
 	bgt	__flush_whole_cache
 1:	tst	r2, #VM_EXEC
+#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
+	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
+	mcrne	p15, 0, r0, c7, c5, 1		@ invalidate I entry
+	add	r0, r0, #CACHE_DLINESIZE
+	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
+	mcrne	p15, 0, r0, c7, c5, 1		@ invalidate I entry
+	add	r0, r0, #CACHE_DLINESIZE
+#else
 	mcr	p15, 0, r0, c7, c14, 1		@ clean and invalidate D entry
 	mcrne	p15, 0, r0, c7, c5, 1		@ invalidate I entry
 	add	r0, r0, #CACHE_DLINESIZE
 	mcr	p15, 0, r0, c7, c14, 1		@ clean and invalidate D entry
 	mcrne	p15, 0, r0, c7, c5, 1		@ invalidate I entry
 	add	r0, r0, #CACHE_DLINESIZE
+#endif
 	cmp	r0, r1
 	blo	1b
 	tst	r2, #VM_EXEC
@@ -172,17 +207,33 @@ ENTRY(mohawk_coherent_kern_range)
  *
  *	- start	- virtual start address
  *	- end	- virtual end address
- *
- * (same as arm926)
  */
 ENTRY(mohawk_coherent_user_range)
 	bic	r0, r0, #CACHE_DLINESIZE - 1
+#if !defined(CONFIG_CPU_PXA168_B0)
+#if defined(CONFIG_CPU_L2_CACHE)
+	mov	r2,	r0
+#endif
+#endif
 1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
 	mcr	p15, 0, r0, c7, c5, 1		@ invalidate I entry
 	add	r0, r0, #CACHE_DLINESIZE
 	cmp	r0, r1
 	blo	1b
 	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
+#if !defined(CONFIG_CPU_PXA168_B0)
+#if defined(CONFIG_CPU_L2_CACHE)
+	mov		r0, r2
+	add		r0, #BAD_CACHE_LINE_OFFSET
+1:	cmp		r0, r1
+	bgt		2f
+	mcr 	p15, 1, r0, c7, c11, 1		@ l2 clean single entry
+	add		r0, #PAGE_SZ
+	b		1b
+2:
+#endif
+	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
+#endif
 	mov	pc, lr
 
 /*
@@ -206,6 +257,31 @@ ENTRY(mohawk_flush_kern_dcache_area)
 	mov	pc, lr
 
 /*
+ *	flush_kern_dcache_page(void *page)
+ *
+ *	Ensure no D cache aliasing occurs, either with itself or
+ *	the I cache
+ *
+ *	- addr	- page aligned address
+ */
+ENTRY(mohawk_flush_kern_dcache_page)
+	add	r1, r0, #PAGE_SZ
+1:	mcr	p15, 0, r0, c7, c14, 1		@ clean+invalidate D entry
+	add	r0, r0, #CACHE_DLINESIZE
+	cmp	r0, r1
+	blo	1b
+#if !defined(CONFIG_CPU_PXA168_B0)
+#if defined(CONFIG_CPU_L2_CACHE)
+	sub		r1, r1,	#CACHE_DLINESIZE
+	mcr		p15, 1, r1, c7, c15, 1		@ L2C clean+invalidate entry
+#endif
+#endif
+	mov	r0, #0
+	mcr	p15, 0, r0, c7, c5, 0		@ invalidate I cache
+	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
+	mov	pc, lr
+
+/*
  *	dma_inv_range(start, end)
  *
  *	Invalidate (discard) the specified virtual address range.
@@ -218,16 +294,26 @@ ENTRY(mohawk_flush_kern_dcache_area)
  *
  * (same as v4wb)
  */
-mohawk_dma_inv_range:
+ENTRY(mohawk_dma_inv_range)
+#ifndef CONFIG_CPU_DCACHE_WRITETHROUGH
 	tst	r0, #CACHE_DLINESIZE - 1
 	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
+	mcrne	p15, 1, r0, c7, c11, 1		@ clean L2 entry
 	tst	r1, #CACHE_DLINESIZE - 1
 	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
+	mcrne	p15, 1, r1, c7, c11, 1		@ clean L2 entry
+#endif
 	bic	r0, r0, #CACHE_DLINESIZE - 1
 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
+	mcr	p15, 1, r0, c7, c7, 1		@ invalidate L2 entry
 	add	r0, r0, #CACHE_DLINESIZE
 	cmp	r0, r1
 	blo	1b
+#if defined(CONFIG_CPU_L2_CACHE) && !defined(L2_CACHE_PREFETCH_DISABLE)
+	tst	r0, #CACHE_DLINESIZE		@ odd last cacheline?
+	mcrne	p15, 0, r0, c7, c14, 1		@ clean+invalidate D entry
+	mcrne	p15, 1, r0, c7, c15, 1		@ L2C clean+invalidate entry
+#endif
 	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
 	mov	pc, lr
 
@@ -241,12 +327,20 @@ mohawk_dma_inv_range:
  *
  * (same as v4wb)
  */
-mohawk_dma_clean_range:
+ENTRY(mohawk_dma_clean_range)
+#ifndef CONFIG_CPU_DCACHE_WRITETHROUGH
 	bic	r0, r0, #CACHE_DLINESIZE - 1
 1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
+	mcr	p15, 1, r0, c7, c11, 1		@ clean L2 entry
 	add	r0, r0, #CACHE_DLINESIZE
 	cmp	r0, r1
 	blo	1b
+#if defined(CONFIG_CPU_L2_CACHE) && !defined(L2_CACHE_PREFETCH_DISABLE)
+	tst	r0, #CACHE_DLINESIZE		@ odd last cacheline?
+	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
+	mcrne	p15, 1, r0, c7, c11, 1		@ L2C clean entry
+#endif
+#endif
 	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
 	mov	pc, lr
 
@@ -261,10 +355,21 @@ mohawk_dma_clean_range:
 ENTRY(mohawk_dma_flush_range)
 	bic	r0, r0, #CACHE_DLINESIZE - 1
 1:
+#ifndef CONFIG_CPU_DCACHE_WRITETHROUGH
 	mcr	p15, 0, r0, c7, c14, 1		@ clean+invalidate D entry
+	mcr	p15, 1, r0, c7, c15, 1		@ clean+invalidate L2 entry
+#else
+	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
+	mcr	p15, 1, r0, c7, c11, 1		@ clean L2 entry
+#endif
 	add	r0, r0, #CACHE_DLINESIZE
 	cmp	r0, r1
 	blo	1b
+#if defined(CONFIG_CPU_L2_CACHE) && !defined(L2_CACHE_PREFETCH_DISABLE)
+	tst	r0, #CACHE_DLINESIZE		@ odd last cacheline?
+	mcrne	p15, 0, r0, c7, c14, 1		@ clean+invalidate D entry
+	mcrne	p15, 1, r0, c7, c15, 1		@ L2C clean+invalidate entry
+#endif
 	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
 	mov	pc, lr
 
@@ -304,12 +409,16 @@ ENTRY(mohawk_cache_fns)
 	.long	mohawk_dma_flush_range
 
 ENTRY(cpu_mohawk_dcache_clean_area)
+#ifndef CONFIG_CPU_DCACHE_WRITETHROUGH
 1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
 	add	r0, r0, #CACHE_DLINESIZE
 	subs	r1, r1, #CACHE_DLINESIZE
 	bhi	1b
+#endif
 	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
 	mov	pc, lr
+
+/* =============================== PageTable ============================== */
 
 /*
  * cpu_mohawk_switch_mm(pgd)
@@ -320,13 +429,31 @@ ENTRY(cpu_mohawk_dcache_clean_area)
  */
 	.align	5
 ENTRY(cpu_mohawk_switch_mm)
+#ifdef CONFIG_MMU
 	mov	ip, #0
-	mcr	p15, 0, ip, c7, c14, 0		@ clean & invalidate all D cache
+#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
+	mcr	p15, 0, ip, c7, c6, 0		@ invalidate D cache
+#else
+@ && 'Clean & Invalidate whole DCache'
+1:	mrc	p15, 0, r15, c7, c14, 3 	@ test,clean,invalidate
+	bne	1b
+#endif
 	mcr	p15, 0, ip, c7, c5, 0		@ invalidate I cache
 	mcr	p15, 0, ip, c7, c10, 4		@ drain WB
-	orr	r0, r0, #0x18			@ cache the page table in L2
+
+#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
+#if defined(CONFIG_CPU_L2_CACHE)
+	orr	r0, r0, #0x10			@ L2 - Outer write-through
+#endif
+#else
+#if defined(CONFIG_CPU_L2_CACHE)
+	orr	r0, r0, #0x18			@ L2 - Outer write-back
+#endif
+#endif
+
 	mcr	p15, 0, r0, c2, c0, 0		@ load page table pointer
 	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I & D TLBs
+#endif
 	mov	pc, lr
 
 /*
@@ -336,10 +463,36 @@ ENTRY(cpu_mohawk_switch_mm)
  */
 	.align	5
 ENTRY(cpu_mohawk_set_pte_ext)
-	armv3_set_pte_ext
+#ifdef CONFIG_MMU
+	str	r1, [r0], #-2048		@ linux version
+
+	eor	r1, r1, #L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_WRITE | L_PTE_DIRTY
+
+	bic	r2, r1, #PTE_SMALL_AP_MASK
+	bic	r2, r2, #PTE_TYPE_MASK
+	orr	r2, r2, #PTE_TYPE_SMALL
+
+	tst	r1, #L_PTE_USER			@ User?
+	orrne	r2, r2, #PTE_SMALL_AP_URO_SRW
+
+	tst	r1, #L_PTE_WRITE | L_PTE_DIRTY	@ Write and Dirty?
+	orreq	r2, r2, #PTE_SMALL_AP_UNO_SRW
+
+	tst	r1, #L_PTE_PRESENT | L_PTE_YOUNG	@ Present and Young?
+	movne	r2, #0
+
+#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
+	eor	r3, r2, #0x0a			@ C & small page?
+	tst	r3, #0x0b
+	biceq	r2, r2, #4
+#endif
+	str	r2, [r0]			@ hardware version
 	mov	r0, r0
+#ifndef CONFIG_CPU_DCACHE_WRITETHROUGH
 	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
+#endif
 	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
+#endif
 	mov	pc, lr
 
 	__INIT
@@ -347,33 +500,72 @@ ENTRY(cpu_mohawk_set_pte_ext)
 	.type	__mohawk_setup, #function
 __mohawk_setup:
 	mov	r0, #0
-	mcr	p15, 0, r0, c7, c7		@ invalidate I,D caches
-	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
-	mcr	p15, 0, r0, c8, c7		@ invalidate I,D TLBs
-	orr	r4, r4, #0x18			@ cache the page table in L2
-	mcr	p15, 0, r4, c2, c0, 0		@ load page table pointer
+	mcr	p15, 0, r0, c7, c7		@ invalidate I,D caches on v4
+	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer on v4
+#ifdef CONFIG_MMU
+	mcr	p15, 0, r0, c8, c7		@ invalidate I,D TLBs on v4
+#if defined(CONFIG_CPU_L2_CACHE)
+	mcr	p15, 1, r0, c7, c7, 0		@ invalidate L2 cache
+#endif
+#endif
 
-	mov	r0, #0				@ don't allow CP access
-	mcr	p15, 0, r0, c15, c1, 0		@ write CP access register
+
+#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
+	mov	r0, #4				@ disable write-back on caches explicitly
+	mcr	p15, 7, r0, c15, c0, 0
+#if defined(CONFIG_CPU_L2_CACHE)
+	orr	r4, r4, #0x10			@ L2 - Outer write through
+#endif
+#else
+#if defined(CONFIG_CPU_L2_CACHE)
+	orr	r4, r4, #0x18			@ L2 - Outer write back
+#endif
+#endif 
+
+#if defined(CONFIG_CPU_L2_CACHE) && defined(L2_CACHE_PREFETCH_DISABLE)
+	mrc	p15, 1, r0, c15, c1, 0		@ get extra features register
+	orr	r0, r0, #(1 << 24)		@ L2 prefetch disable
+	mcr	p15, 1, r0, c15, c1, 0		@ set extra features register
+#endif
 
 	adr	r5, mohawk_crval
 	ldmia	r5, {r5, r6}
-	mrc	p15, 0, r0, c1, c0		@ get control register
+	mrc	p15, 0, r0, c1, c0		@ get control register v4
 	bic	r0, r0, r5
 	orr	r0, r0, r6
-	mov	pc, lr
+	orr	r0, r0, #0x800			@ BPU enable
+#ifdef CONFIG_CPU_CACHE_ROUND_ROBIN
+	orr	r0, r0, #0x4000			@ .1.. .... .... ....
+#endif
+#if defined(CONFIG_CPU_L2_CACHE)
+#ifdef TTC_Z0_SUPPORT
+	ldr	r6, =0xd4282c00
+	ldr	r5, [r6]
+	mov 	r5, r5, lsl #8
+	mov	r5, r5, lsr #28
+	cmp	r5, #0xa			@ check TTC A0 stepping or not
+	orrne	r0, r0, #(1 << 26)		@ L2 enable - xscale/PJ41/PJ4
+#else
+	orr	r0, r0, #(1 << 26)		@ L2 enable - xscale/PJ41/PJ4
+#endif
+#endif
+	mrc	p15, 1, r5, c15, c1, 0		@ get extra features register
+	orr	r5, r5, #(1<<29)		@ streaming enable
+	orr     r5, r5, #0x700                  @ 8-wait cycles write coalesce
+	mcr     p15, 1, r5, c15, c1, 0          @ set extra features register
 
+	mov	pc, lr
 	.size	__mohawk_setup, . - __mohawk_setup
 
 	/*
 	 *  R
 	 * .RVI ZFRS BLDP WCAM
-	 * .011 1001 ..00 0101
-	 *
+	 * .011 0001 ..11 0101
+	 * 
 	 */
 	.type	mohawk_crval, #object
 mohawk_crval:
-	crval	clear=0x00007f3f, mmuset=0x00003905, ucset=0x00001134
+	crval	clear=0x00007f3f, mmuset=0x00003135, ucset=0x00001134
 
 	__INITDATA
 
@@ -384,7 +576,6 @@ mohawk_crval:
 	.type	mohawk_processor_functions, #object
 mohawk_processor_functions:
 	.word	v5t_early_abort
-	.word	legacy_pabort
 	.word	cpu_mohawk_proc_init
 	.word	cpu_mohawk_proc_fin
 	.word	cpu_mohawk_reset
@@ -398,7 +589,7 @@ mohawk_processor_functions:
 
 	.type	cpu_arch_name, #object
 cpu_arch_name:
-	.asciz	"armv5te"
+	.asciz	"armv5tej"
 	.size	cpu_arch_name, . - cpu_arch_name
 
 	.type	cpu_elf_name, #object
@@ -408,16 +599,43 @@ cpu_elf_name:
 
 	.type	cpu_mohawk_name, #object
 cpu_mohawk_name:
-	.asciz	"Marvell 88SV331x"
+	.asciz	"Marvell Mohawk"
 	.size	cpu_mohawk_name, . - cpu_mohawk_name
 
 	.align
 
 	.section ".proc.info.init", #alloc, #execinstr
 
-	.type	__88sv331x_proc_info,#object
-__88sv331x_proc_info:
-	.long	0x56158000			@ Marvell 88SV331x (MOHAWK)
+#ifdef CONFIG_CPU_MOHAWK_OLD_ID
+	.type	__mohawk_old_id_proc_info,#object
+	__mohawk_old_id_proc_info:
+	.long	0x41159260
+	.long	0xfffffff0
+	.long   PMD_TYPE_SECT | \
+		PMD_SECT_BUFFERABLE | \
+		PMD_SECT_CACHEABLE | \
+		PMD_BIT4 | \
+		PMD_SECT_AP_WRITE | \
+		PMD_SECT_AP_READ
+		.long   PMD_TYPE_SECT | \
+			PMD_BIT4 | \
+			PMD_SECT_AP_WRITE | \
+			PMD_SECT_AP_READ
+			b	__mohawk_setup
+			.long	cpu_arch_name
+			.long	cpu_elf_name
+			.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
+			.long	cpu_mohawk_name
+			.long	mohawk_processor_functions
+			.long	v4wbi_tlb_fns
+			.long	v4wb_user_fns
+			.long	mohawk_cache_fns
+			.size	__mohawk_old_id_proc_info, . - __mohawk_old_id_proc_info
+#endif
+
+	.type	__mohawk_proc_info,#object
+__mohawk_proc_info:
+	.long	0x56158000			@ Marvell PXA168
 	.long	0xfffff000
 	.long   PMD_TYPE_SECT | \
 		PMD_SECT_BUFFERABLE | \
@@ -432,10 +650,11 @@ __88sv331x_proc_info:
 	b	__mohawk_setup
 	.long	cpu_arch_name
 	.long	cpu_elf_name
-	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
+	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP|HWCAP_JAVA
 	.long	cpu_mohawk_name
 	.long	mohawk_processor_functions
 	.long	v4wbi_tlb_fns
 	.long	v4wb_user_fns
 	.long	mohawk_cache_fns
-	.size	__88sv331x_proc_info, . - __88sv331x_proc_info
+	.size	__mohawk_proc_info, . - __mohawk_proc_info
+

@@ -19,6 +19,8 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/onenand.h>
 #include <linux/mtd/partitions.h>
+#include <mach/pxa3xx_bbm.h>
+
 #include <asm/io.h>
 
 /*
@@ -43,7 +45,13 @@ struct onenand_info {
 static int __devinit generic_onenand_probe(struct platform_device *pdev)
 {
 	struct onenand_info *info;
-	struct onenand_platform_data *pdata = pdev->dev.platform_data;
+	struct flash_platform_data *pdata = pdev->dev.platform_data;
+	struct resource *res = pdev->resource;
+#ifdef CONFIG_MTD_PARTITIONS
+	struct mtd_partition *partitions = NULL, *parts = NULL;
+	int part_num;
+#endif
+	unsigned long size = res->end - res->start + 1;
 	struct resource *res = pdev->resource;
 	unsigned long size = resource_size(res);
 	int err;
@@ -52,7 +60,7 @@ static int __devinit generic_onenand_probe(struct platform_device *pdev)
 	if (!info)
 		return -ENOMEM;
 
-	if (!request_mem_region(res->start, size, dev_name(&pdev->dev))) {
+	if (!request_mem_region(res->start, size, pdev->name)) {
 		err = -EBUSY;
 		goto out_free_info;
 	}
@@ -70,6 +78,16 @@ static int __devinit generic_onenand_probe(struct platform_device *pdev)
 	info->mtd.priv = &info->onenand;
 	info->mtd.owner = THIS_MODULE;
 
+#ifdef CONFIG_PXA3XX_BBM
+	info->onenand.scan_bbt = pxa3xx_scan_bbt;
+	info->onenand.block_bad = pxa3xx_block_bad;
+	info->onenand.block_markbad = pxa3xx_block_markbad;
+#else
+	info->onenand.scan_bbt = NULL;
+	info->onenand.block_bad = NULL;
+	info->onenand.block_markbad = NULL;
+#endif
+
 	if (onenand_scan(&info->mtd, 1)) {
 		err = -ENXIO;
 		goto out_iounmap;
@@ -77,6 +95,29 @@ static int __devinit generic_onenand_probe(struct platform_device *pdev)
 
 #ifdef CONFIG_MTD_PARTITIONS
 	err = parse_mtd_partitions(&info->mtd, part_probes, &info->parts, 0);
+	if (err > 0) {
+		partitions = info->parts;
+		part_num = err;
+	}
+	else if (err <= 0 && pdata->parts) {
+		partitions = pdata->parts;
+		part_num = pdata->nr_parts;
+	}
+
+	if (part_num > 0 && partitions) {
+#ifdef CONFIG_PXA3XX_BBM
+			struct pxa3xx_bbm *pxa3xx_bbm = info->mtd.bbm;
+			parts = pxa3xx_bbm->check_partition(&info->mtd, partitions, &part_num);
+			if (!parts)
+				return -EINVAL;
+#else
+			parts = partitions;
+#endif
+		add_mtd_partitions(&info->mtd, parts, part_num);
+#ifdef CONFIG_PXA3XX_BBM
+		kfree(parts);
+#endif
+	}
 	if (err > 0)
 		add_mtd_partitions(&info->mtd, info->parts, err);
 	else if (err <= 0 && pdata && pdata->parts)
@@ -101,7 +142,8 @@ out_free_info:
 
 static int __devexit generic_onenand_remove(struct platform_device *pdev)
 {
-	struct onenand_info *info = platform_get_drvdata(pdev);
+	struct onenand_info *info = dev_get_drvdata(&pdev->dev);
+	//struct onenand_info *info = platform_get_drvdata(pdev);
 	struct resource *res = pdev->resource;
 	unsigned long size = resource_size(res);
 
@@ -129,8 +171,11 @@ static struct platform_driver generic_onenand_driver = {
 	},
 	.probe		= generic_onenand_probe,
 	.remove		= __devexit_p(generic_onenand_remove),
+#ifdef CONFIG_PM
+	.suspend	= NULL,
+	.resume		= NULL,
+#endif
 };
-
 MODULE_ALIAS(DRIVER_NAME);
 
 static int __init generic_onenand_init(void)

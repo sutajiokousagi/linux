@@ -1,6 +1,12 @@
 #ifndef __ASM_ARM_DMA_H
 #define __ASM_ARM_DMA_H
 
+typedef unsigned int dmach_t;
+
+#include <linux/spinlock.h>
+#include <asm/system.h>
+#include <asm/scatterlist.h>
+#include <mach/dma.h>
 #include <asm/memory.h>
 
 /*

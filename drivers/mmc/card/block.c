@@ -278,6 +278,14 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 			brq.data.blocks = card->host->max_blk_count;
 
 		/*
+		 * The block layer doesn't support all sector count
+		 * restrictions, so we need to be prepared for too big
+		 * requests.
+		 */
+		if (brq.data.blocks > card->host->max_blk_count)
+			brq.data.blocks = card->host->max_blk_count;
+
+		/*
 		 * After a read error, we redo the request one sector at a time
 		 * in order to accurately determine which sectors can be read
 		 * successfully.
@@ -445,20 +453,20 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 	 * as reported by the controller (which might be less than
 	 * the real number of written sectors, but never more).
 	 */
-	if (mmc_card_sd(card)) {
-		u32 blocks;
+		if (mmc_card_sd(card)) {
+			u32 blocks;
 
-		blocks = mmc_sd_num_wr_blocks(card);
-		if (blocks != (u32)-1) {
+			blocks = mmc_sd_num_wr_blocks(card);
+			if (blocks != (u32)-1) {
+				spin_lock_irq(&md->lock);
+				ret = __blk_end_request(req, 0, blocks << 9);
+				spin_unlock_irq(&md->lock);
+			}
+		} else {
 			spin_lock_irq(&md->lock);
-			ret = __blk_end_request(req, 0, blocks << 9);
+			ret = __blk_end_request(req, 0, brq.data.bytes_xfered);
 			spin_unlock_irq(&md->lock);
 		}
-	} else {
-		spin_lock_irq(&md->lock);
-		ret = __blk_end_request(req, 0, brq.data.bytes_xfered);
-		spin_unlock_irq(&md->lock);
-	}
 
 	mmc_release_host(card->host);
 

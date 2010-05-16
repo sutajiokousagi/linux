@@ -154,3 +154,44 @@ config SND_PXA2XX_SOC_IMOTE2
        help
          Say Y if you want to add support for SoC audio on the
 	 IMote 2.
+
+menu "SoC Audio for the Intel PXA3xx"
+config SND_PXA3XX_SOC
+	tristate "SoC Audio for the Intel PXA3xx chip"
+	depends on ARCH_MMP && SND
+	select SND_PCM
+	help
+	  Say Y or M if you want to add support for codecs attached to
+	  the PXA3xx AC97, I2S or SSP interface. You will also need
+	  to select the audio interfaces to support below.
+
+config SND_PXA3XX_SOC_SSP
+	bool "Soc Audio for the Intel PXA3xx SSP interface"
+	depends on ARCH_MMP && SND
+        help
+	  Say Y or M if you want to add support for PXA3xx ssp interface.
+
+config SND_PXA3XX_SOC_ASPENITE
+        bool "SoC Audio support for Aspenite"
+	depends on SND_PXA3XX_SOC && MACH_ASPENITE
+	select SND_SOC_WM8753
+	help
+	  Say Y if you want to add support for SoC audio on ZYLONITE2
+
+config SND_PXA168_SOC_AVLite
+	bool "SoC Audio support for AVLite"
+	depends on SND_PXA3XX_SOC && ARCH_MMP
+	select SND_PXA3XX_SOC_SSP
+	select SND_SOC_WM8960
+	help
+	  Say Y if you want to add support for SoC audio on AVLite
+
+config SND_PXA3XX_SOC_TETON_BGA
+	bool "SoC Audio support for Teton BGA"
+	depends on SND_PXA3XX_SOC && MACH_TETON_BGA
+	select SND_SOC_CS4344
+	help
+	  Say Y if you want to add support for SoC audio on Teton
+	  with the CS4344 DAC.
+
+endmenu

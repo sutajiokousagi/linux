@@ -219,7 +219,7 @@ config SPI_PPC4xx
 
 config SPI_PXA2XX
 	tristate "PXA2xx SSP SPI master"
-	depends on ARCH_PXA && EXPERIMENTAL
+	depends on (ARCH_PXA || ARCH_MMP) && EXPERIMENTAL
 	select PXA_SSP
 	help
 	  This enables using a PXA2xx SSP port as a SPI master controller.

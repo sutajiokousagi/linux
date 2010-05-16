@@ -9,6 +9,10 @@
 #include <asm-generic/dma-coherent.h>
 #include <asm/memory.h>
 
+#if !defined(ARCH_DMA_CACHE_ALIGNMENT)
+#define ARCH_DMA_CACHE_ALIGNMENT 32
+#endif
+
 /*
  * page_to_dma/dma_to_virt/virt_to_dma are architecture private functions
  * used internally by the DMA-mapping API to provide DMA addresses. They
@@ -146,7 +150,7 @@ static inline int dma_set_mask(struct device *dev, u64 dma_mask)
 
 static inline int dma_get_cache_alignment(void)
 {
-	return 32;
+	return ARCH_DMA_CACHE_ALIGNMENT;
 }
 
 static inline int dma_is_consistent(struct device *dev, dma_addr_t handle)

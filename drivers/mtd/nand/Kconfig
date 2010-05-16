@@ -376,6 +376,39 @@ config MTD_NAND_PXA3xx_BUILTIN
 	  This enables builtin definitions for some NAND chips. This
 	  is deprecated in favor of platform specific data.
 
+choice
+	prompt "Select MLC NAND Device"
+	depends on MTD_NAND_PXA3xx
+	default DEFAULT_NAND
+
+config SAMSUNG_32G_MLC_NAND
+	bool "Use 32G MLC NAND (K9LBG08U0D)"
+	help
+	  This enables the support for Samsung MLC 32Gb NAND (K9LBG08U0D)
+
+config SAMSUNG_8G_MLC_NAND
+	bool "Use 8G MLC NAND (K9G8G08U0A)"
+	help
+	  This enables the support for Samsung MLC 8Gb NAND (K9G8G08U0A)
+
+config MICRON_32G_MLC_NAND
+	bool "Use Micron 32G MLC NAND (29F32G08CBABA)"
+	help
+	  This enables the support for Micron MLC 32Gb NAND (29F32G08CBABA)
+
+config SAMSUNG_512M_SLC_NAND
+	bool "Use Samsung Small Block 64Mbyte SLC NAND (K9F1208UOC)"
+	help
+	  This enables the support for Samsung small block SLC NAND (K9F1208UOC)
+
+
+config DEFAULT_NAND
+	bool "Use Micron 4G SLC NAND"
+	help
+	  This enables the support for the default Micron SLC 4Gb NAND (29F4G08AAC)
+endchoice
+
+
 config MTD_NAND_CM_X270
 	tristate "Support for NAND Flash on CM-X270 modules"
 	depends on MTD_NAND && MACH_ARMCORE

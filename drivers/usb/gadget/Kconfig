@@ -191,7 +191,6 @@ config USB_GADGET_OMAP
 	boolean "OMAP USB Device Controller"
 	depends on ARCH_OMAP
 	select ISP1301_OMAP if MACH_OMAP_H2 || MACH_OMAP_H3 || MACH_OMAP_H4_OTG
-	select USB_OTG_UTILS if ARCH_OMAP
 	help
 	   Many Texas Instruments OMAP processors have flexible full
 	   speed USB device controllers, with support for up to 30
@@ -291,6 +290,43 @@ config USB_PXA27X
 	default USB_GADGET
 	select USB_GADGET_SELECTED
 
+config USB_GADGET_PXA_U2O
+        bool "PXA9xx Processor USB 2.0 controller"
+        select USB_GADGET_DUALSPEED
+        help
+            PXA9xx Processor series include a high speed USB 2.0 device
+	    controller, which support high speed and full speed USB Peripheral.
+
+config USB_PXA_U2O
+        tristate
+        depends on USB_GADGET_PXA_U2O
+        default USB_GADGET
+	select USB_GADGET_SELECTED
+
+config USB_COMPOSITE
+	boolean "Multiple gadget drivers support (EXPERIMENTAL)"
+	depends on USB_GADGET_PXA_U2O
+	default n
+	help
+	   Multiple gadget drivers support in the PXA9xx controller driver.
+	   user can insmod several gadget drivers to implement more
+	   than one function on the device. There are several restrictions
+	   to such gadget drivers, and maybe modifications to the host driver.
+
+	   supported gadget drivers combination(connect to linux host machine):
+		CDC ACM(or serial) + CDC Ethernet + mass storage
+
+config USB_OTG
+        boolean "OTG Support"
+        depends on USB_EHCI_HCD && USB_GADGET_PXA_U2O
+	default n
+	select USB_OTG_PXA3XX
+	select USB_EHCI_PXA_U2O
+        help
+
+config USB_OTG_PXA3XX
+        depends on USB_OTG
+
 config USB_GADGET_S3C_HSOTG
 	boolean "S3C HS/OtG USB Device controller"
 	depends on S3C_DEV_USB_HSOTG
@@ -353,7 +389,7 @@ config USB_S3C2410_DEBUG
 
 # musb builds in ../musb along with host support
 config USB_GADGET_MUSB_HDRC
-	boolean "Inventra HDRC USB Peripheral (TI, ADI, ...)"
+	boolean "Inventra HDRC USB Peripheral (TI, ...)"
 	depends on USB_MUSB_HDRC && (USB_MUSB_PERIPHERAL || USB_MUSB_OTG)
 	select USB_GADGET_DUALSPEED
 	select USB_GADGET_SELECTED
@@ -420,24 +456,6 @@ config USB_GADGET_FSL_QE
 config USB_FSL_QE
 	tristate
 	depends on USB_GADGET_FSL_QE
-	default USB_GADGET
-	select USB_GADGET_SELECTED
-
-config USB_GADGET_CI13XXX
-	boolean "MIPS USB CI13xxx"
-	depends on PCI
-	select USB_GADGET_DUALSPEED
-	help
-	  MIPS USB IP core family device controller
-	  Currently it only supports IP part number CI13412
-
-	  Say "y" to link the driver statically, or "m" to build a
-	  dynamically linked module called "ci13xxx_udc" and force all
-	  gadget drivers to also be dynamically linked.
-
-config USB_CI13XXX
-	tristate
-	depends on USB_GADGET_CI13XXX
 	default USB_GADGET
 	select USB_GADGET_SELECTED
 
@@ -797,6 +815,14 @@ config USB_G_PRINTER
 
 	  For more information, see Documentation/usb/gadget_printer.txt
 	  which includes sample code for accessing the device file.
+
+config USB_ANDROID
+	tristate "Android Gadget"
+	help
+	  The Android gadget provides mass storage and adb transport.
+
+	  Say "y" to link the driver statically, or "m" to build a
+	  dynamically linked module called "g_android".
 
 config USB_CDC_COMPOSITE
 	tristate "CDC Composite Device (Ethernet and ACM)"

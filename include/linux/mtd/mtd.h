@@ -237,6 +237,9 @@ struct mtd_info {
 
 	void *priv;
 
+	/* bad block management */
+	void *bbm;
+
 	struct module *owner;
 	struct device dev;
 	int usecount;

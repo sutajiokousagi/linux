@@ -1099,6 +1099,20 @@ MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_AUTHOR (DRIVER_AUTHOR);
 MODULE_LICENSE ("GPL");
 
+#ifdef CONFIG_USB_EHCI_PXA_U2H
+#include "ehci-pxau2h.c"
+#define PLATFORM_DRIVER		pxau2h_ehci_driver
+#endif
+
+#ifdef CONFIG_USB_EHCI_PXA_U2O
+#include "ehci-pxau2o.c"
+#ifndef PLATFORM_DRIVER
+#define PLATFORM_DRIVER		pxa9xx_ehci_driver
+#else
+#define PLATFORM_DRIVER2	pxa9xx_ehci_driver
+#endif
+#endif
+
 #ifdef CONFIG_PCI
 #include "ehci-pci.c"
 #define	PCI_DRIVER		ehci_pci_driver
@@ -1193,6 +1207,12 @@ static int __init ehci_hcd_init(void)
 
 #ifdef PLATFORM_DRIVER
 	retval = platform_driver_register(&PLATFORM_DRIVER);
+	if (retval < 0)
+		goto clean0;
+#endif
+
+#ifdef PLATFORM_DRIVER2
+	retval = platform_driver_register(&PLATFORM_DRIVER2);
 	if (retval < 0)
 		goto clean0;
 #endif

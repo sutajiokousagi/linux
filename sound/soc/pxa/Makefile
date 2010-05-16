@@ -3,10 +3,15 @@ snd-soc-pxa2xx-objs := pxa2xx-pcm.o
 snd-soc-pxa2xx-ac97-objs := pxa2xx-ac97.o
 snd-soc-pxa2xx-i2s-objs := pxa2xx-i2s.o
 snd-soc-pxa-ssp-objs := pxa-ssp.o
+snd-soc-pxa3xx-objs := pxa3xx-pcm.o
+snd-soc-pxa3xx-ssp-objs := pxa3xx-ssp.o
+
 
 obj-$(CONFIG_SND_PXA2XX_SOC) += snd-soc-pxa2xx.o
 obj-$(CONFIG_SND_PXA2XX_SOC_AC97) += snd-soc-pxa2xx-ac97.o
 obj-$(CONFIG_SND_PXA2XX_SOC_I2S) += snd-soc-pxa2xx-i2s.o
+obj-$(CONFIG_SND_PXA3XX_SOC) += snd-soc-pxa3xx.o
+obj-$(CONFIG_SND_PXA3XX_SOC_SSP) += snd-soc-pxa3xx-ssp.o
 obj-$(CONFIG_SND_PXA_SOC_SSP) += snd-soc-pxa-ssp.o
 
 # PXA Machine Support
@@ -24,6 +29,9 @@ snd-soc-magician-objs := magician.o
 snd-soc-mioa701-objs := mioa701_wm9713.o
 snd-soc-imote2-objs := imote2.o
 snd-soc-raumfeld-objs := raumfeld.o
+snd-soc-aspenite-objs := aspenite.o
+snd-soc-avlite-objs := avlite.o
+snd-soc-teton_bga-objs := teton_bga.o
 
 obj-$(CONFIG_SND_PXA2XX_SOC_CORGI) += snd-soc-corgi.o
 obj-$(CONFIG_SND_PXA2XX_SOC_POODLE) += snd-soc-poodle.o
@@ -39,3 +47,6 @@ obj-$(CONFIG_SND_PXA2XX_SOC_MIOA701) += snd-soc-mioa701.o
 obj-$(CONFIG_SND_SOC_ZYLONITE) += snd-soc-zylonite.o
 obj-$(CONFIG_SND_PXA2XX_SOC_IMOTE2) += snd-soc-imote2.o
 obj-$(CONFIG_SND_SOC_RAUMFELD) += snd-soc-raumfeld.o
+obj-$(CONFIG_SND_PXA3XX_SOC_ASPENITE) += snd-soc-aspenite.o
+obj-$(CONFIG_SND_PXA168_SOC_AVLite) += snd-soc-avlite.o
+obj-$(CONFIG_SND_PXA3XX_SOC_TETON_BGA) += snd-soc-teton_bga.o

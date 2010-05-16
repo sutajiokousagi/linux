@@ -14,7 +14,10 @@
 #include <linux/module.h>
 #include <linux/suspend.h>
 #include <linux/errno.h>
+<<<<<<< HEAD:arch/arm/mach-pxa/pm.c
+=======
 #include <linux/slab.h>
+>>>>>>> e40152ee1e1c7a63f4777791863215e3faa37a86:arch/arm/mach-pxa/pm.c
 
 #include <mach/pm.h>
 

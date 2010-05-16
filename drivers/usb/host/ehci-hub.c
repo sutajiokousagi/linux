@@ -728,8 +728,17 @@ static int ehci_hub_control (
 		temp = ehci_readl(ehci, status_reg);
 
 		// wPortChange bits
-		if (temp & PORT_CSC)
+		if (temp & PORT_CSC) {
 			status |= 1 << USB_PORT_FEAT_C_CONNECTION;
+#ifdef CONFIG_USB_OTG
+			if (hcd->driver->connect && hcd->driver->disconnect) {
+				if (temp & PORT_CONNECT)
+					hcd->driver->connect(hcd, NULL);
+				else
+					hcd->driver->disconnect(hcd);
+			}
+#endif
+		}
 		if (temp & PORT_PEC)
 			status |= 1 << USB_PORT_FEAT_C_ENABLE;
 

@@ -13,22 +13,25 @@
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/io.h>
+#include <linux/delay.h>
 
-#include <asm/mach/time.h>
 #include <mach/addr-map.h>
 #include <mach/regs-apbc.h>
 #include <mach/regs-apmu.h>
+#include <mach/regs-mpmu.h>
 #include <mach/cputype.h>
 #include <mach/irqs.h>
 #include <mach/gpio.h>
 #include <mach/dma.h>
 #include <mach/mfp.h>
-#include <mach/devices.h>
+#include <plat/i2c.h>
+#include <mach/pxa910-squ.h>
 
 #include "common.h"
 #include "clock.h"
 
 #define MFPR_VIRT_BASE	(APB_VIRT_BASE + 0x1e000)
+#define FAB_CTRL	(AXI_VIRT_BASE + 0x260)
 
 static struct mfp_addr_map pxa910_mfp_addr_map[] __initdata =
 {
@@ -78,103 +81,185 @@ static struct mfp_addr_map pxa910_mfp_addr_map[] __initdata =
 	MFP_ADDR_END,
 };
 
-#define APMASK(i)	(GPIO_REGS_VIRT + BANK_OFF(i) + 0x09c)
+struct gc_rate_table {
+	unsigned long	rate;
+	unsigned int	flag;
+};
 
-static void __init pxa910_init_gpio(void)
+static struct gc_rate_table gc500_rates [] = {
+	/* put highest rate at the top of the table */
+	{
+		.rate	=	400000000,
+		.flag	=	APMU_GC_PLL2,
+	},
+	{
+		.rate	=	312000000,
+		.flag	=	APMU_GC_312M,
+	},
+	{
+		.rate	=	200000000,
+		.flag	=	APMU_GC_PLL2_DIV2,
+	},
+	{
+		.rate	=	156000000,
+		.flag	=	APMU_GC_156M,
+	},
+};
+
+static void gc500_clk_enable(struct clk *clk)
+{
+	u32 tmp = __raw_readl(clk->clk_rst);
+
+	//__raw_writel(0x1f0f0f, APMU_XD_CLK_RES_CTRL); /*it will hang on old stepping*/
+	__raw_writel(tmp | 0x38, clk->clk_rst);
+	__raw_writel(tmp | 0x238, clk->clk_rst);
+	udelay(200); /* at least 200 us*/
+	__raw_writel(tmp | 0x638, clk->clk_rst);
+	__raw_writel(tmp | 0x63a, clk->clk_rst);
+	udelay(100); /* at least 48 cycles)*/
+	__raw_writel(tmp | 0x73f, clk->clk_rst);
+	__raw_writel(0x1f, APMU_GC_PD);
+}
+
+static void gc500_clk_disable(struct clk *clk)
+{
+	u32 tmp = __raw_readl(clk->clk_rst);
+
+	__raw_writel(tmp | 0x63f, clk->clk_rst);
+	__raw_writel(tmp | 0x23f, clk->clk_rst);
+	__raw_writel(tmp | 0x03f, clk->clk_rst);
+}
+
+static int gc_lookaround_rate(unsigned long target_rate, u32 *flag)
 {
 	int i;
 
-	/* enable GPIO clock */
-	__raw_writel(APBC_APBCLK | APBC_FNCLK, APBC_PXA910_GPIO);
-
-	/* unmask GPIO edge detection for all 4 banks - APMASKx */
-	for (i = 0; i < 4; i++)
-		__raw_writel(0xffffffff, APMASK(i));
-
-	pxa_init_gpio(IRQ_PXA910_AP_GPIO, 0, 127, NULL);
+	for (i=0; i<ARRAY_SIZE(gc500_rates); i++) {
+		if (target_rate >= gc500_rates[i].rate)
+			break;
+	}
+	if (i==ARRAY_SIZE(gc500_rates)) i--;
+	*flag = gc500_rates[i].flag;
+	return gc500_rates[i].rate;
 }
 
-void __init pxa910_init_irq(void)
+static int gc500_clk_setrate(struct clk *clk, unsigned long target_rate)
 {
-	icu_init_irq();
-	pxa910_init_gpio();
+	u32 tmp, flag;
+	int rate = gc_lookaround_rate(target_rate, &flag);
+
+	clk->rate = rate;
+	__raw_writel(0xf, APMU_GC_PD);
+	tmp = __raw_readl(clk->clk_rst);
+	tmp &= ~0xc0;
+	tmp |= flag;
+	__raw_writel(tmp, clk->clk_rst);
+	return 0;
 }
 
-/* APB peripheral clocks */
-static APBC_CLK(uart1, PXA910_UART0, 1, 14745600);
-static APBC_CLK(uart2, PXA910_UART1, 1, 14745600);
-static APBC_CLK(twsi0, PXA168_TWSI0, 1, 33000000);
-static APBC_CLK(twsi1, PXA168_TWSI1, 1, 33000000);
-static APBC_CLK(pwm1, PXA910_PWM1, 1, 13000000);
-static APBC_CLK(pwm2, PXA910_PWM2, 1, 13000000);
-static APBC_CLK(pwm3, PXA910_PWM3, 1, 13000000);
-static APBC_CLK(pwm4, PXA910_PWM4, 1, 13000000);
+static unsigned long gc500_clk_getrate(struct clk *clk)
+{
+	return clk->rate;
+}
 
-static APMU_CLK(nand, NAND, 0x01db, 208000000);
+struct clkops gc500_clk_ops = {
+	.enable		= gc500_clk_enable,
+	.disable	= gc500_clk_disable,
+	.setrate	= gc500_clk_setrate,
+	.getrate	= gc500_clk_getrate,
+};
 
-/* device and clock bindings */
+static APBC_UART_CLK(uart1, PXA168_UART0, 14745600);
+static APBC_UART_CLK(uart2, PXA168_UART1, 14745600);
+static APBC_UART_CLK(pxa910_uart3, PXA910_UART2, 14745600);
+static APBC_CLK(twsi0, PXA910_TWSI0, 1, 33000000);
+static APBC_CLK(twsi1, PXA910_TWSI1, 1, 33000000);
+static APBC_CLK(keypad, PXA168_KPC, 0, 32000);
+static APBC_CLK(ssp1,  PXA910_SSP1,  0, 0);
+
+static PSEUDO_CLK(iscclk, 0, 0, 0);	/* pseudo clock for imm */
+
+static APMU_CLK(lcd, LCD, 0x003f, 312000000);	/* 312MHz, HCLK, CLK, AXICLK */
+static APMU_CLK(nand, NAND, 0x1DB, 208000000);
+static APMU_CLK_OPS(u2o, USB, 480000000, &u2o_clk_ops);	/* 480MHz, AXICLK */
+static APMU_CLK(ire, IRE, 0x8, 0);
+static APMU_CLK_OPS(gc, GC, 0, &gc500_clk_ops);
+static APMU_CLK(sdh0, SDH0, 0x001b, 48000000);	/* 48MHz, CLK, AXICLK */
+static APMU_CLK(sdh1, SDH1, 0x001b, 48000000);	/* 48MHz, CLK, AXICLK */
+static APMU_CLK(sdh2, SDH2, 0x001b, 48000000);	/* 48MHz, CLK, AXICLK */
+static APMU_CLK(sdh3, SDH3, 0x001b, 48000000);	/* 48MHz, CLK, AXICLK */
+static APMU_CLK(ccic_rst, CCIC_RST, 0x0, 312000000);
+static APMU_CLK(ccic_gate, CCIC_GATE, 0xfff, 0);
+
 static struct clk_lookup pxa910_clkregs[] = {
 	INIT_CLKREG(&clk_uart1, "pxa2xx-uart.0", NULL),
 	INIT_CLKREG(&clk_uart2, "pxa2xx-uart.1", NULL),
+	INIT_CLKREG(&clk_pxa910_uart3, "pxa2xx-uart.2", NULL),
 	INIT_CLKREG(&clk_twsi0, "pxa2xx-i2c.0", NULL),
 	INIT_CLKREG(&clk_twsi1, "pxa2xx-i2c.1", NULL),
-	INIT_CLKREG(&clk_pwm1, "pxa910-pwm.0", NULL),
-	INIT_CLKREG(&clk_pwm2, "pxa910-pwm.1", NULL),
-	INIT_CLKREG(&clk_pwm3, "pxa910-pwm.2", NULL),
-	INIT_CLKREG(&clk_pwm4, "pxa910-pwm.3", NULL),
-	INIT_CLKREG(&clk_nand, "pxa3xx-nand", NULL),
+	INIT_CLKREG(&clk_lcd, "pxa168-fb", "LCDCLK"),
+	INIT_CLKREG(&clk_lcd, "pxa910-fb", NULL),
+	INIT_CLKREG(&clk_nand, "pxa3xx-nand", "NANDCLK"),
+	INIT_CLKREG(&clk_u2o, NULL, "U2OCLK"),
+	INIT_CLKREG(&clk_keypad, "pxa27x-keypad", NULL),
+	INIT_CLKREG(&clk_ire, "pxa910-ire", NULL),
+	INIT_CLKREG(&clk_ssp1, "pxa168-ssp.1", NULL),
+	INIT_CLKREG(&clk_gc, NULL, "GCCLK"),
+	INIT_CLKREG(&clk_ssp1,  "pxa910-ssp.1", NULL),
+	INIT_CLKREG(&clk_iscclk,  NULL, "ISCCLK"),
+	INIT_CLKREG(&clk_sdh0, "pxa-sdh.0", "PXA-SDHCLK"),
+	INIT_CLKREG(&clk_sdh1, "pxa-sdh.1", "PXA-SDHCLK"),
+	INIT_CLKREG(&clk_sdh2, "pxa-sdh.2", "PXA-SDHCLK"),
+	INIT_CLKREG(&clk_sdh3, "pxa-sdh.3", "PXA-SDHCLK"),
+        INIT_CLKREG(&clk_ccic_rst, "pxa168-camera", "CCICRSTCLK"),
+        INIT_CLKREG(&clk_ccic_gate, "pxa168-camera", "CCICGATECLK"),
 };
+
+void pxa910_set_pll2(void)
+{
+	u32 tmp = __raw_readl(MPMU_PLL2CR);
+
+	/* FIXME default set to 400MHz */
+	tmp &= ~((0x1f<<19) | (0x1ff<<10));
+	tmp |= ((4<<19) | (61<<10));
+	tmp |= (1<<9);
+
+	__raw_writel(tmp, MPMU_PLL2CR);
+}
+
+/* ACIPC clock is initialized by CP, enable the clock by default
+ * and this clock is always enabled.
+ */
+static void pxa910_init_acipc_clock(void)
+{
+	__raw_writel(0x3, APBC_PXA910_ACIPC);
+}
+static void pxa910_init_ripc_clock(void)
+{
+        __raw_writel(0x2, APBC_PXA910_RIPC);
+}
 
 static int __init pxa910_init(void)
 {
+	u32 tmp;
+
 	if (cpu_is_pxa910()) {
 		mfp_init_base(MFPR_VIRT_BASE);
 		mfp_init_addr(pxa910_mfp_addr_map);
-		pxa_init_dma(IRQ_PXA910_DMA_INT0, 32);
-		clkdev_add_table(ARRAY_AND_SIZE(pxa910_clkregs));
+		pxa_init_dma(IRQ_PXA168_DMA_INT0, 32);
+		pxa910_init_squ(2);
+
+		/* FIXME set PLL2 here temporarily */
+		pxa910_set_pll2();
+		pxa910_init_acipc_clock();
+		pxa910_init_ripc_clock();
+		/* Enable AXI write request for gc500 */
+		tmp = __raw_readl(FAB_CTRL);
+        	__raw_writel(tmp | 0x8, FAB_CTRL);
+
+		clks_register(ARRAY_AND_SIZE(pxa910_clkregs));
 	}
 
 	return 0;
 }
 postcore_initcall(pxa910_init);
-
-/* system timer - clock enabled, 3.25MHz */
-#define TIMER_CLK_RST	(APBC_APBCLK | APBC_FNCLK | APBC_FNCLKSEL(3))
-
-static void __init pxa910_timer_init(void)
-{
-	/* reset and configure */
-	__raw_writel(APBC_APBCLK | APBC_RST, APBC_PXA910_TIMERS);
-	__raw_writel(TIMER_CLK_RST, APBC_PXA910_TIMERS);
-
-	timer_init(IRQ_PXA910_AP1_TIMER1);
-}
-
-struct sys_timer pxa910_timer = {
-	.init	= pxa910_timer_init,
-};
-
-/* on-chip devices */
-
-/* NOTE: there are totally 3 UARTs on PXA910:
- *
- *   UART1   - Slow UART (can be used both by AP and CP)
- *   UART2/3 - Fast UART
- *
- * To be backward compatible with the legacy FFUART/BTUART/STUART sequence,
- * they are re-ordered as:
- *
- *   pxa910_device_uart1 - UART2 as FFUART
- *   pxa910_device_uart2 - UART3 as BTUART
- *
- * UART1 is not used by AP for the moment.
- */
-PXA910_DEVICE(uart1, "pxa2xx-uart", 0, UART2, 0xd4017000, 0x30, 21, 22);
-PXA910_DEVICE(uart2, "pxa2xx-uart", 1, UART3, 0xd4018000, 0x30, 23, 24);
-PXA910_DEVICE(twsi0, "pxa2xx-i2c", 0, TWSI0, 0xd4011000, 0x28);
-PXA910_DEVICE(twsi1, "pxa2xx-i2c", 1, TWSI1, 0xd4025000, 0x28);
-PXA910_DEVICE(pwm1, "pxa910-pwm", 0, NONE, 0xd401a000, 0x10);
-PXA910_DEVICE(pwm2, "pxa910-pwm", 1, NONE, 0xd401a400, 0x10);
-PXA910_DEVICE(pwm3, "pxa910-pwm", 2, NONE, 0xd401a800, 0x10);
-PXA910_DEVICE(pwm4, "pxa910-pwm", 3, NONE, 0xd401ac00, 0x10);
-PXA910_DEVICE(nand, "pxa3xx-nand", -1, NAND, 0xd4283000, 0x80, 97, 99);

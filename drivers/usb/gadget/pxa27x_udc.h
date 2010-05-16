@@ -28,6 +28,8 @@
 #include <linux/io.h>
 #include <linux/usb/otg.h>
 
+#include <plat/pxausb_common.h>
+
 /*
  * Register definitions
  */
@@ -387,24 +389,6 @@ struct pxa27x_request {
 	unsigned				in_use:1;
 	struct list_head			queue;
 };
-
-enum ep0_state {
-	WAIT_FOR_SETUP,
-	SETUP_STAGE,
-	IN_DATA_STAGE,
-	OUT_DATA_STAGE,
-	IN_STATUS_STAGE,
-	OUT_STATUS_STAGE,
-	STALL,
-	WAIT_ACK_SET_CONF_INTERF
-};
-
-static char *ep0_state_name[] = {
-	"WAIT_FOR_SETUP", "SETUP_STAGE", "IN_DATA_STAGE", "OUT_DATA_STAGE",
-	"IN_STATUS_STAGE", "OUT_STATUS_STAGE", "STALL",
-	"WAIT_ACK_SET_CONF_INTERF"
-};
-#define EP0_STNAME(udc) ep0_state_name[(udc)->ep0state]
 
 #define EP0_FIFO_SIZE	16U
 #define BULK_FIFO_SIZE	64U

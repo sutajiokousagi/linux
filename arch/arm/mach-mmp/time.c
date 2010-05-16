@@ -28,14 +28,12 @@
 #include <linux/sched.h>
 #include <linux/cnt32_to_63.h>
 
+#include <asm/mach/time.h>
 #include <mach/addr-map.h>
-#include <mach/regs-timers.h>
 #include <mach/regs-apbc.h>
+#include <mach/regs-timers.h>
 #include <mach/irqs.h>
 #include <mach/cputype.h>
-#include <asm/mach/time.h>
-
-#include "clock.h"
 
 #define TIMERS_VIRT_BASE	TIMERS1_VIRT_BASE
 
@@ -61,19 +59,51 @@ static void __init set_tcr2ns_scale(unsigned long tcr_rate)
 }
 
 /*
- * FIXME: the timer needs some delay to stablize the counter capture
+ * Note: the timer needs some delay to stablize the counter capture
  */
 static inline uint32_t timer_read(void)
 {
-	int delay = 100;
+	volatile int delay = 2;
+	unsigned long flags;
+	uint32_t val = 0;
+
+	local_irq_save(flags);
+
+#ifdef CONFIG_PXA_32KTIMER
+	/* 32k timer needs more delay due to brain-damaged hardware :-( */
+	//if (CLOCK_TICK_RATE == 32768)
+		//delay = 100;*/
+	val = __raw_readl(TIMERS_VIRT_BASE + TMR_CR(0));
+#else
 
 	__raw_writel(1, TIMERS_VIRT_BASE + TMR_CVWR(0));
 
-	while (delay--)
-		cpu_relax();
+	while (delay--) {
+		val = __raw_readl(TIMERS_VIRT_BASE + TMR_CVWR(0));
+	}
 
-	return __raw_readl(TIMERS_VIRT_BASE + TMR_CVWR(0));
+	val = __raw_readl(TIMERS_VIRT_BASE + TMR_CVWR(0));
+#endif
+	local_irq_restore(flags);
+
+	return val;
 }
+
+unsigned int read_timer(void)
+{
+	return (unsigned int)timer_read();
+}
+
+#if 0 /* FIX-ME: rzaman: figure out how to resolve this */
+unsigned long read_persistent_clock(void)
+{
+	unsigned int ticks;
+	unsigned long sec;
+	ticks = read_timer();
+	sec = (unsigned long)ticks >> 15;
+	return sec;
+}
+#endif
 
 unsigned long long sched_clock(void)
 {
@@ -133,8 +163,13 @@ static void timer_set_mode(enum clock_event_mode mode,
 static struct clock_event_device ckevt = {
 	.name		= "clockevent",
 	.features	= CLOCK_EVT_FEAT_ONESHOT,
+#ifdef CONFIG_PXA_32KTIMER
+	.shift		= 32,
+	.rating		= 150,
+#else
 	.shift		= 32,
 	.rating		= 200,
+#endif
 	.set_next_event	= timer_set_next_event,
 	.set_mode	= timer_set_mode,
 };
@@ -146,8 +181,13 @@ static cycle_t clksrc_read(struct clocksource *cs)
 
 static struct clocksource cksrc = {
 	.name		= "clocksource",
+#ifdef CONFIG_PXA_32KTIMER
+	.shift		= 10,
+	.rating		= 150,
+#else
 	.shift		= 20,
 	.rating		= 200,
+#endif
 	.read		= clksrc_read,
 	.mask		= CLOCKSOURCE_MASK(32),
 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
@@ -182,7 +222,7 @@ static struct irqaction timer_irq = {
 	.dev_id		= &ckevt,
 };
 
-void __init timer_init(int irq)
+static void __init timer_init(int irq)
 {
 	timer_config();
 
@@ -200,6 +240,157 @@ void __init timer_init(int irq)
 	clocksource_register(&cksrc);
 	clockevents_register_device(&ckevt);
 }
+
+static void __init pxa168_timer_init(void)
+{
+	uint32_t clk_rst;
+
+	/* this is early, we have to initialize the CCU registers by
+	 * ourselves instead of using clk_* API. Clock rate is defined
+	 * by APBC_TIMERS_FNCLKSEL and enabled free-running
+	 */
+	__raw_writel(APBC_APBCLK | APBC_RST, APBC_PXA168_TIMERS);
+
+#ifdef CONFIG_PXA_32KTIMER
+	/* 32KHz, bus/functional clock enabled, release reset */
+	clk_rst = APBC_APBCLK | APBC_FNCLK | APBC_FNCLKSEL(1);
+#else
+	/* 3.25MHz, bus/functional clock enabled, release reset */
+	clk_rst = APBC_APBCLK | APBC_FNCLK | APBC_FNCLKSEL(3);
+#endif
+	__raw_writel(clk_rst, APBC_PXA168_TIMERS);
+
+	timer_init(IRQ_PXA168_TIMER1);
+}
+
+#ifdef CONFIG_PM
+struct tmr_regs {
+	unsigned int		tmr_ccr;
+	unsigned int		tmr_tn_mm[9];
+	unsigned int		tmr_crn[3];
+	unsigned int		tmr_srn[3];
+	unsigned int		tmr_iern[3];
+	unsigned int		tmr_plvrn[3];
+	unsigned int		tmr_plcrn[3];
+	unsigned int		tmr_wmer;
+	unsigned int		tmr_wmr;
+	unsigned int		tmr_wvr;
+	unsigned int		tmr_wsr;
+	unsigned int		tmr_icrn[3];
+	unsigned int		tmr_wicr;
+	unsigned int		tmr_cer;
+	unsigned int		tmr_cmr;
+	unsigned int		tmr_ilrn[3];
+	unsigned int		tmr_wcr;
+	unsigned int		tmr_wfar;
+	unsigned int		tmr_wsar;
+	unsigned int		tmr_cvwrn[3];
+};
+
+static struct tmr_regs tmr_saved_regs;
+/* static struct tmr_regs tmr2_saved_regs; */
+
+static void pxa168_tmr_save(struct tmr_regs *context, unsigned int tmr_base)
+{
+	unsigned int i, j, temp;
+
+	context->tmr_ccr = __raw_readl(tmr_base + TMR_CCR);
+	for (i = 0 ;i < 3;i++) {
+		/* double read to avoid metastability */
+		do {
+			temp = __raw_readl(tmr_base + TMR_CR(i));
+			context->tmr_crn[i] = __raw_readl(tmr_base + TMR_CR(i));
+		} while (context->tmr_crn[i] != temp);
+	}
+	/* save time difference instead of match counter register itself */
+	for (i = 0; i < 3; i++)
+		for (j = 0; j < 3; j++)
+			context->tmr_tn_mm[i*3+j] = __raw_readl(tmr_base + TMR_TN_MM(i,j))
+				- context->tmr_crn[i];
+	for (i = 0 ;i < 3;i++)
+		context->tmr_iern[i] = __raw_readl(tmr_base + TMR_IER(i));
+	for (i = 0 ;i < 3;i++)
+		context->tmr_plvrn[i] = __raw_readl(tmr_base + TMR_PLVR(i));
+	for (i = 0 ;i < 3;i++)
+		context->tmr_plcrn[i] = __raw_readl(tmr_base + TMR_PLCR(i));
+	for (i = 0 ;i < 3;i++)
+		context->tmr_ilrn[i] = __raw_readl(tmr_base + TMR_ILR(i));
+	context->tmr_cmr = __raw_readl(tmr_base + TMR_CMR);
+	context->tmr_cer = __raw_readl(tmr_base + TMR_CER);
+
+	/* the following should be done in a watchdog driver... */
+	context->tmr_wmer = __raw_readl(tmr_base + TMR_WMER);
+	do {
+		temp = __raw_readl(tmr_base + TMR_WVR);
+		context->tmr_wvr = __raw_readl(tmr_base + TMR_WVR);
+	} while (context->tmr_wvr != temp);
+	context->tmr_wmr = __raw_readl(tmr_base + TMR_WMR) - context->tmr_wvr;
+	context->tmr_wicr = __raw_readl(tmr_base + TMR_WICR);
+	context->tmr_wcr = __raw_readl(tmr_base + TMR_WCR);
+}
+
+static void pxa168_tmr_restore(struct tmr_regs *context, unsigned int tmr_base)
+{
+	unsigned int i, j, temp;
+
+	__raw_writel(context->tmr_ccr, tmr_base + TMR_CCR);
+	for (i = 0 ;i < 3;i++) {
+		/* double read to avoid metastability */
+		do {
+			temp = __raw_readl(tmr_base + TMR_CR(i));
+			context->tmr_crn[i] = __raw_readl(tmr_base + TMR_CR(i));
+		} while (context->tmr_crn[i] != temp);
+	}
+	/* restore match counter register based on current counter and
+	 * the time difference we saved before */
+	for (i = 0; i < 3; i++)
+		for (j = 0; j < 3; j++) {
+			context->tmr_tn_mm[3*i+j] += context->tmr_crn[i];
+			__raw_writel(context->tmr_tn_mm[3*i+j], tmr_base + TMR_TN_MM(i,j));
+		}
+	for (i = 0 ;i < 3;i++)
+		__raw_writel(context->tmr_iern[i], tmr_base + TMR_IER(i));
+	for (i = 0 ;i < 3;i++)
+		__raw_writel(0x7, tmr_base + TMR_ICR(i));
+	for (i = 0 ;i < 3;i++)
+		__raw_writel(context->tmr_plvrn[i], tmr_base + TMR_PLVR(i));
+	for (i = 0 ;i < 3;i++)
+		__raw_writel(context->tmr_plcrn[i], tmr_base + TMR_PLCR(i));
+	for (i = 0 ;i < 3;i++)
+		__raw_writel(context->tmr_ilrn[i], tmr_base + TMR_ILR(i));
+	__raw_writel(context->tmr_cmr, tmr_base + TMR_CMR);
+	__raw_writel(context->tmr_cer, tmr_base + TMR_CER);
+
+	/* the following should be done in a watchdog driver... */
+	__raw_writel(0xbaba, tmr_base + TMR_WFAR);
+	__raw_writel(0xeb10, tmr_base + TMR_WSAR);
+	__raw_writel(context->tmr_wmr, tmr_base + TMR_WMR);
+	__raw_writel(context->tmr_wicr, tmr_base + TMR_WICR);
+	__raw_writel(context->tmr_wcr, tmr_base + TMR_WCR);
+	__raw_writel(context->tmr_wmer, tmr_base + TMR_WMER);
+}
+
+static void pxa_timer_suspend(void)
+{
+	pxa168_tmr_save(&tmr_saved_regs, TIMERS1_VIRT_BASE);
+	/* pxa168_tmr_save(&tmr2_saved_regs, TIMERS2_VIRT_BASE); */
+}
+
+static void pxa_timer_resume(void)
+{
+	pxa168_tmr_restore(&tmr_saved_regs, TIMERS1_VIRT_BASE);
+	/* pxa168_tmr_restore(&tmr2_saved_regs, TIMERS2_VIRT_BASE); */
+}
+#else
+#define pxa_timer_suspend NULL
+#define pxa_timer_resume NULL
+#endif
+
+struct sys_timer pxa168_timer = {
+	.init		= pxa168_timer_init,
+	.suspend	= pxa_timer_suspend,
+	.resume		= pxa_timer_resume,
+};
 
 static void __init mmp2_timer_init(void)
 {

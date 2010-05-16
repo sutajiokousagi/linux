@@ -173,6 +173,7 @@
 static DEFINE_SPINLOCK(ptype_lock);
 static struct list_head ptype_base[PTYPE_HASH_SIZE] __read_mostly;
 static struct list_head ptype_all __read_mostly;	/* Taps */
+static int rx_sched;
 
 /*
  * The @dev_base_head list is protected by @dev_base_lock and the rtnl
@@ -2216,14 +2217,18 @@ int netif_rx(struct sk_buff *skb)
 
 	__get_cpu_var(netdev_rx_stat).total++;
 	if (queue->input_pkt_queue.qlen <= netdev_max_backlog) {
-		if (queue->input_pkt_queue.qlen) {
+		if (queue->input_pkt_queue.qlen && rx_sched) {
 enqueue:
 			__skb_queue_tail(&queue->input_pkt_queue, skb);
 			local_irq_restore(flags);
 			return NET_RX_SUCCESS;
 		}
-
+#if 0
+		if (queue->input_pkt_queue.qlen != 0)
+			printk("+++ qlen %d\n", queue->input_pkt_queue.qlen);
+#endif
 		napi_schedule(&queue->backlog);
+		rx_sched = 1;
 		goto enqueue;
 	}
 
@@ -2932,6 +2937,10 @@ static int process_backlog(struct napi_struct *napi, int quota)
 		netif_receive_skb(skb);
 	} while (++work < quota && jiffies == start_time);
 
+	napi_gro_flush(napi);
+
+out:
+	rx_sched = 0;
 	return work;
 }
 

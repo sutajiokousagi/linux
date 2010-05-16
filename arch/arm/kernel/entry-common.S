@@ -93,15 +93,21 @@ ENDPROC(ret_from_fork)
 
 #ifdef CONFIG_FUNCTION_TRACER
 #ifdef CONFIG_DYNAMIC_FTRACE
+ENTRY(__gnu_mcount_nc)
+	stmdb sp!, {r0-r3, lr}
+	mov r0, lr
+	sub r0, r0, #MCOUNT_INSN_SIZE
+	bl ftrace_stub
+	ldmia sp!, {r0-r3, ip, lr}
+	mov pc, ip
+
 ENTRY(mcount)
 	stmdb sp!, {r0-r3, lr}
 	mov r0, lr
 	sub r0, r0, #MCOUNT_INSN_SIZE
-
-	.globl mcount_call
-mcount_call:
 	bl ftrace_stub
 	ldr lr, [fp, #-4]			@ restore lr
+	msr     CPSR_f, #0x60000000
 	ldmia sp!, {r0-r3, pc}
 
 ENTRY(ftrace_caller)
@@ -114,7 +120,13 @@ ENTRY(ftrace_caller)
 ftrace_call:
 	bl ftrace_stub
 	ldr lr, [fp, #-4]			@ restore lr
+#ifndef KBUILD_NEW_GNU_MCOUNT
+	msr     CPSR_f, #0x60000000
 	ldmia sp!, {r0-r3, pc}
+#else
+	ldmia sp!, {r0-r3, ip, lr}
+	mov pc, ip
+#endif
 
 #else
 
@@ -154,6 +166,7 @@ trace:
 	mov lr, pc
 	mov pc, r2
 	ldr lr, [fp, #-4]			@ restore lr
+	msr     CPSR_f, #0x60000000
 	ldmia sp!, {r0-r3, pc}
 
 #endif /* CONFIG_DYNAMIC_FTRACE */

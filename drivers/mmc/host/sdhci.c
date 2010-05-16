@@ -23,11 +23,20 @@
 #include <linux/leds.h>
 
 #include <linux/mmc/host.h>
+#include <linux/mmc/mmc.h>
+#include <linux/mmc/sdhci.h>
 
-#include "sdhci.h"
+#include <mach/cputype.h>
+#include <asm/mach-types.h>
 
-#define DRIVER_NAME "sdhci"
 
+#undef WARNINGS
+
+#define SUPPORT_8_BIT_MMC
+#ifdef WARNINGS
+#warning REDEFINED DRIVER NAME to pxa-sdh
+#endif
+#define DRIVER_NAME	"pxa-sdh"
 #define DBG(f, x...) \
 	pr_debug(DRIVER_NAME " [%s()]: " f, __func__,## x)
 
@@ -173,6 +182,12 @@ static void sdhci_reset(struct sdhci_host *host, u8 mask)
 
 	if (host->quirks & SDHCI_QUIRK_RESTORE_IRQS_AFTER_RESET)
 		sdhci_clear_set_irqs(host, SDHCI_INT_ALL_MASK, ier);
+
+#ifdef WARNINGS
+#warning  RESET NEEED FOR PRIVATE REGISTERS
+#endif
+	if (host->ops->platform_specific_reset)
+		host->ops->platform_specific_reset(host, mask);
 }
 
 static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios);
@@ -589,6 +604,15 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_data *data)
 	if (host->quirks & SDHCI_QUIRK_BROKEN_TIMEOUT_VAL)
 		return 0xE;
 
+	/*
+	 * A High Capacity SD and Extended Capacity SD indicates TAAC and
+	 * NSAC of CSD as fixed values. Host should use 100ms
+	 * timeout(minimum) for read operations. It's strongly recommended
+	 * for host to use more than 500ms timeout for write operations.
+	 */
+	if (!data->timeout_ns && !data->timeout_clks)
+		return 0xE;
+
 	/* timeout in us */
 	target_timeout = data->timeout_ns / 1000 +
 		data->timeout_clks / host->clock;
@@ -896,6 +920,18 @@ static void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 		mdelay(1);
 	}
 
+
+#ifdef WARNINGS
+#warning HACK FOR CPU TOO FAST
+#endif
+	/*
+	 * we cannot talk to controller for 8 bus cycles according to sdio spec
+	 * at lowest speed this is 100,000 HZ per cycle or 800,000 cycles
+	 * which is quite a LONG TIME on a fast cpu -- so delay if needed
+	 */
+	if (host->ops->platform_specific_delay)
+		host->ops->platform_specific_delay(host);
+
 	mod_timer(&host->timer, jiffies + 10 * HZ);
 
 	host->cmd = cmd;
@@ -943,8 +979,15 @@ static void sdhci_finish_command(struct sdhci_host *host)
 		if (host->cmd->flags & MMC_RSP_136) {
 			/* CRC is stripped so we need to do some shifting. */
 			for (i = 0;i < 4;i++) {
-				host->cmd->resp[i] = sdhci_readl(host,
-					SDHCI_RESPONSE + (3-i)*4) << 8;
+				if(cpu_is_pxa910() && (0 == i)){
+					/* Workaround PXA910/920 response reading mode limitation */
+					u32 resp6, resp7;
+					resp6 = sdhci_readw(host, SDHCI_RESPONSE + 0xc);
+					resp7 = sdhci_readb(host, SDHCI_RESPONSE + 0xe);
+					host->cmd->resp[i] = resp6 << 8 | resp7 << 24;
+				} else
+					host->cmd->resp[i] = sdhci_readl(host,
+							SDHCI_RESPONSE + (3-i)*4) << 8;
 				if (i != 3)
 					host->cmd->resp[i] |=
 						sdhci_readb(host,
@@ -1086,7 +1129,7 @@ static void sdhci_set_power(struct sdhci_host *host, unsigned short power)
 static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 {
 	struct sdhci_host *host;
-	bool present;
+	bool present = false;
 	unsigned long flags;
 
 	host = mmc_priv(mmc);
@@ -1102,11 +1145,18 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 	host->mrq = mrq;
 
 	/* If polling, assume that the card is always present. */
-	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
+	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION) {
 		present = true;
-	else
+	}
+	else if (host->ops->platform_get_cd) {
+		if (host->ops->platform_get_cd(mmc) == 0) {
+			present = true;
+		}
+	}
+	else {
 		present = sdhci_readl(host, SDHCI_PRESENT_STATE) &
-				SDHCI_CARD_PRESENT;
+		 		SDHCI_CARD_PRESENT;
+	}
 
 	if (!present || host->flags & SDHCI_DEVICE_DEAD) {
 		host->mrq->cmd->error = -ENOMEDIUM;
@@ -1149,12 +1199,38 @@ static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 
 	ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
 
+#ifdef SUPPORT_8_BIT_MMC
+
+#ifdef WARNINGS
+#warning ENABLE 8 bit support
+#endif
+	if (ios->bus_width == MMC_BUS_WIDTH_8) {
+		if (host->ops->platform_set_8_bit)
+			host->ops->platform_set_8_bit(host);
+	}
+	else if (ios->bus_width == MMC_BUS_WIDTH_4) {
+		if (host->ops->platform_clear_8_bit)
+			host->ops->platform_clear_8_bit(host);
+		ctrl |= SDHCI_CTRL_4BITBUS;
+	}
+	else {
+		if (host->ops->platform_clear_8_bit)
+			host->ops->platform_clear_8_bit(host);
+		ctrl &= ~SDHCI_CTRL_4BITBUS;
+	}
+#else
 	if (ios->bus_width == MMC_BUS_WIDTH_4)
 		ctrl |= SDHCI_CTRL_4BITBUS;
 	else
 		ctrl &= ~SDHCI_CTRL_4BITBUS;
+#endif
 
-	if (ios->timing == MMC_TIMING_SD_HS)
+#ifdef WARNINGS
+#warning CHECK FOR BROKEN HIGH SPEED BIT
+#endif
+	if (host->quirks & SDHCI_QUIRK_BROKEN_HOST_HIGHSPEED)
+		ctrl &= ~SDHCI_CTRL_HISPD;
+	else if (ios->timing == MMC_TIMING_SD_HS)
 		ctrl |= SDHCI_CTRL_HISPD;
 	else
 		ctrl &= ~SDHCI_CTRL_HISPD;
@@ -1182,6 +1258,9 @@ static int sdhci_get_ro(struct mmc_host *mmc)
 
 	host = mmc_priv(mmc);
 
+	if (host->ops->platform_specific_get_ro)
+		return host->ops->platform_specific_get_ro(mmc);
+
 	spin_lock_irqsave(&host->lock, flags);
 
 	if (host->flags & SDHCI_DEVICE_DEAD)
@@ -1207,6 +1286,12 @@ static void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable)
 
 	if (host->flags & SDHCI_DEVICE_DEAD)
 		goto out;
+
+#ifdef WARNINGS
+#warning enable sdio private operation (FIFO PARM)
+#endif
+	if (host->ops->platform_specific_sdio)
+		host->ops->platform_specific_sdio(host, enable);
 
 	if (enable)
 		sdhci_unmask_irqs(host, SDHCI_INT_CARD_INT);
@@ -1298,6 +1383,8 @@ static void sdhci_tasklet_finish(unsigned long param)
 		   controllers do not like that. */
 		sdhci_reset(host, SDHCI_RESET_CMD);
 		sdhci_reset(host, SDHCI_RESET_DATA);
+	} else {
+			sdhci_reset(host, SDHCI_RESET_DATA);
 	}
 
 	host->mrq = NULL;
@@ -1456,16 +1543,24 @@ static void sdhci_data_irq(struct sdhci_host *host, u32 intmask)
 
 	if (intmask & SDHCI_INT_DATA_TIMEOUT)
 		host->data->error = -ETIMEDOUT;
-	else if (intmask & (SDHCI_INT_DATA_CRC | SDHCI_INT_DATA_END_BIT))
+	else if (intmask & SDHCI_INT_DATA_END_BIT)
 		host->data->error = -EILSEQ;
+	else if ((intmask & SDHCI_INT_DATA_CRC) &&
+		SDHCI_GET_CMD(sdhci_readw(host, SDHCI_COMMAND)) != MMC_BUSTEST_R) {
+		host->data->error = -EILSEQ;
+		printk(KERN_ERR "%s: CRC error\n", mmc_hostname(host->mmc));
+	}
 	else if (intmask & SDHCI_INT_ADMA_ERROR) {
 		printk(KERN_ERR "%s: ADMA error\n", mmc_hostname(host->mmc));
 		sdhci_show_adma_error(host);
 		host->data->error = -EIO;
 	}
 
-	if (host->data->error)
+	if (host->data->error) {
+		printk ("%s: Data Error = %d, intmask = %08X\n",__FUNCTION__,host->data->error, intmask);
+		sdhci_dumpregs(host);
 		sdhci_finish_data(host);
+	}
 	else {
 		if (intmask & (SDHCI_INT_DATA_AVAIL | SDHCI_INT_SPACE_AVAIL))
 			sdhci_transfer_pio(host);
@@ -1516,6 +1611,12 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
 	if (intmask & (SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE)) {
 		sdhci_writel(host, intmask & (SDHCI_INT_CARD_INSERT |
 			SDHCI_INT_CARD_REMOVE), SDHCI_INT_STATUS);
+#ifdef WARNINGS
+#warning PLATFORM SPECIFC INIT
+#endif
+		if (host->ops->init)
+			host->ops->init(host, intmask);
+
 		tasklet_schedule(&host->card_tasklet);
 	}
 
@@ -1531,6 +1632,8 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
 		sdhci_writel(host, intmask & SDHCI_INT_DATA_MASK,
 			SDHCI_INT_STATUS);
 		sdhci_data_irq(host, intmask & SDHCI_INT_DATA_MASK);
+
+		sdhci_writeb(host, SDHCI_RESET_DATA, SDHCI_SOFTWARE_RESET);
 	}
 
 	intmask &= ~(SDHCI_INT_CMD_MASK | SDHCI_INT_DATA_MASK);
@@ -1584,6 +1687,8 @@ out:
 int sdhci_suspend_host(struct sdhci_host *host, pm_message_t state)
 {
 	int ret;
+	printk ("%s: ENTER\n", __FUNCTION__);
+	sdhci_disable_card_detection(host);
 
 	sdhci_disable_card_detection(host);
 
@@ -1602,13 +1707,17 @@ int sdhci_resume_host(struct sdhci_host *host)
 {
 	int ret;
 
+	printk ("%s: ENTER\n", __FUNCTION__);
 	if (host->flags & (SDHCI_USE_SDMA | SDHCI_USE_ADMA)) {
 		if (host->ops->enable_dma)
 			host->ops->enable_dma(host);
 	}
 
+#ifdef WARNINGS
+#warning request IRQ on DRIVER_NAME
+#endif
 	ret = request_irq(host->irq, sdhci_irq, IRQF_SHARED,
-			  mmc_hostname(host->mmc), host);
+			  DRIVER_NAME, host);
 	if (ret)
 		return ret;
 
@@ -1741,17 +1850,44 @@ int sdhci_add_host(struct sdhci_host *host)
 		mmc_dev(host->mmc)->dma_mask = &host->dma_mask;
 	}
 
-	host->max_clk =
-		(caps & SDHCI_CLOCK_BASE_MASK) >> SDHCI_CLOCK_BASE_SHIFT;
-	host->max_clk *= 1000000;
-	if (host->max_clk == 0) {
-		if (!host->ops->get_max_clock) {
-			printk(KERN_ERR
-			       "%s: Hardware doesn't specify base clock "
-			       "frequency.\n", mmc_hostname(mmc));
-			return -ENODEV;
+	if (host->quirks & SDHCI_QUIRK_USE_SUPPLIED_CLOCKS) {
+		if (host->ops->get_max_clock) {
+			host->max_clk = host->ops->get_max_clock(host);
+
+			if (host->ops->get_f_max_clock)
+				mmc->f_max = host->ops->get_f_max_clock(host);
+			else
+				mmc->f_max = host->max_clk;
+
+			if (host->ops->get_f_min_clock)
+				mmc->f_min = host->ops->get_f_min_clock(host);
+			else
+				mmc->f_min = host->max_clk / 256;
 		}
-		host->max_clk = host->ops->get_max_clock(host);
+		else
+			host->max_clk = 0;  // force error
+	} else {
+		host->max_clk =
+			(caps & SDHCI_CLOCK_BASE_MASK) >> SDHCI_CLOCK_BASE_SHIFT;
+		host->max_clk *= 1000000;
+		if (host->max_clk == 0) {
+			if (!host->ops->get_max_clock) {
+				printk(KERN_ERR
+					   "%s: Hardware doesn't specify base clock "
+					   "frequency.\n", mmc_hostname(mmc));
+				return -ENODEV;
+			}
+			host->max_clk = host->ops->get_max_clock(host);
+		}
+		mmc->f_min = host->max_clk / 256;
+		mmc->f_max = host->max_clk;
+	}
+
+	if (host->max_clk == 0) {
+		printk(KERN_ERR
+			"%s: Hardware doesn't specify base clock "
+			"frequency.\n", mmc_hostname(mmc));
+		return -ENODEV;
 	}
 
 	host->timeout_clk =
@@ -1785,8 +1921,18 @@ int sdhci_add_host(struct sdhci_host *host)
 	if (!(host->quirks & SDHCI_QUIRK_FORCE_1_BIT_DATA))
 		mmc->caps |= MMC_CAP_4_BIT_DATA;
 
+#ifdef SUPPORT_8_BIT_MMC
+#ifdef WARNINGS
+#warning ADD support for 8 BIT
+#endif
+	if (host->ops->platform_supports_8_bit) {
+		if (host->ops->platform_supports_8_bit(host))
+			mmc->caps |= MMC_CAP_8_BIT_DATA;
+	}
+#endif
+
 	if (caps & SDHCI_CAN_DO_HISPD)
-		mmc->caps |= MMC_CAP_SD_HIGHSPEED;
+		mmc->caps |= MMC_CAP_SD_HIGHSPEED | MMC_CAP_MMC_HIGHSPEED;
 
 	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
 		mmc->caps |= MMC_CAP_NEEDS_POLL;
@@ -1868,8 +2014,11 @@ int sdhci_add_host(struct sdhci_host *host)
 
 	setup_timer(&host->timer, sdhci_timeout_timer, (unsigned long)host);
 
+#ifdef WARNINGS
+#warning request IRQ on DRIVER_NAME
+#endif
 	ret = request_irq(host->irq, sdhci_irq, IRQF_SHARED,
-		mmc_hostname(mmc), host);
+			  DRIVER_NAME, host);
 	if (ret)
 		goto untasklet;
 
@@ -1900,6 +2049,8 @@ int sdhci_add_host(struct sdhci_host *host)
 		mmc_hostname(mmc), host->hw_name, dev_name(mmc_dev(mmc)),
 		(host->flags & SDHCI_USE_ADMA) ? "ADMA" :
 		(host->flags & SDHCI_USE_SDMA) ? "DMA" : "PIO");
+
+	sdhci_enable_card_detection(host);
 
 	sdhci_enable_card_detection(host);
 

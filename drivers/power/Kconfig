@@ -64,6 +64,12 @@ config BATTERY_DS2760
 	help
 	  Say Y here to enable support for batteries with ds2760 chip.
 
+config BATTERY_SANREMO
+	tristate "SANREMO battery driver (Used with sanremo)"
+	depends on SANREMO
+	help
+	  Say Y here to enable support for batteries with sanremo chip
+
 config BATTERY_DS2782
 	tristate "DS2782 standalone gas-gauge"
 	depends on I2C
@@ -130,5 +136,21 @@ config CHARGER_PCF50633
 	depends on MFD_PCF50633
 	help
 	 Say Y to include support for NXP PCF50633 Main Battery Charger.
+
+config POWER_AVENGERS_LITE
+	tristate "avengers-lite power driver "
+	help
+	  Say Y here to enable support for power supply.
+
+config BATTERY_ASPENITE
+	tristate "ASPENITE battery driver"
+	help
+	  Say Y to enable support for virtual battery on ASPENITE platform.
+
+config MCU_PM
+        bool "Avengers-lite Power Management Chips"
+        depends on I2C && I2C_PXA
+        help
+           if you say yes you get support for the power management MCU chip
 
 endif # POWER_SUPPLY

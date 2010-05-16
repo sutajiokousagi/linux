@@ -307,6 +307,12 @@ config TOUCHSCREEN_MIGOR
 	  To compile this driver as a module, choose M here: the
 	  module will be called migor_ts.
 
+config TOUCHSCREEN_SYNAPTICS_I2C_RMI
+	tristate "Synaptics i2c touchscreen"
+	depends on I2C
+	help
+	  This enables support for Synaptics RMI over I2C based touchscreens.
+
 config TOUCHSCREEN_TOUCHRIGHT
 	tristate "Touchright serial touchscreen"
 	select SERIO
@@ -565,16 +571,43 @@ config TOUCHSCREEN_TOUCHIT213
 	  To compile this driver as a module, choose M here: the
 	  module will be called touchit213.
 
-config TOUCHSCREEN_TSC2007
-	tristate "TSC2007 based touchscreens"
-	depends on I2C
+config TSC2007
+	boolean "TSC2007 chip"
+	depends on I2C && I2C_PXA
+	default n
 	help
-	  Say Y here if you have a TSC2007 based touchscreen.
+	  TSC2007 touch screen support.
+	  If you say yes here, you support for it.
 
-	  If unsure, say N.
+	  This driver can NOT be built as a module.
 
-	  To compile this driver as a module, choose M here: the
-	  module will be called tsc2007.
+config TOUCHSCREEN_SANREMO
+	bool "SANREMO Touchscreen interface support"
+	depends on I2C && I2C_PXA && SANREMO
+	default y
+	help
+	  Say Y here to enable support for the Sanremo touchscreen controller.
+
+config TOUCHSCREEN_TPO
+	bool "TPO Touchscreen interface support"
+	depends on I2C && I2C_PXA
+	default y
+	help
+	  Say Y here to enable support for the TPO touchscreen controller.
+
+config TOUCHSCREEN_MICCO
+	tristate "MICCO based touchscreen"
+	depends on I2C && I2C_PXA && MICCO
+	default y
+	help
+	  Say Y here if you want to enable micco touch driver
+
+config TOUCHSCREEN_MICCO_TIMER
+	tristate "optimize performane using timer"
+	depends on TOUCHSCREEN_MICCO
+	default y
+	help
+	  Say Y here if you want to optimize micco touch performance
 
 config TOUCHSCREEN_W90X900
 	tristate "W90P910 touchscreen driver"

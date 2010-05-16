@@ -387,6 +387,10 @@ static int __init mtd_speedtest_init(void)
 	speed = calc_speed();
 	printk(PRINT_PREF "eraseblock write speed is %ld KiB/s\n", speed);
 
+	err = erase_whole_device();
+	if (err)
+		goto out;
+
 	/* Read all eraseblocks, 1 eraseblock at a time */
 	printk(PRINT_PREF "testing eraseblock read speed\n");
 	start_timing();
@@ -405,6 +409,9 @@ static int __init mtd_speedtest_init(void)
 	err = erase_whole_device();
 	if (err)
 		goto out;
+
+	simple_srand(1);
+	set_random_data(iobuf, mtd->erasesize);
 
 	/* Write all eraseblocks, 1 page at a time */
 	printk(PRINT_PREF "testing page write speed\n");

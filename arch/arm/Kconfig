@@ -18,6 +18,8 @@ config ARM
 	select HAVE_KPROBES if (!XIP_KERNEL)
 	select HAVE_KRETPROBES if (HAVE_KPROBES)
 	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
+	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL)
+	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
 	select HAVE_GENERIC_DMA_COHERENT
 	select HAVE_KERNEL_GZIP
 	select HAVE_KERNEL_LZO
@@ -523,6 +525,7 @@ config ARCH_MMP
 	select GENERIC_CLOCKEVENTS
 	select TICK_ONESHOT
 	select PLAT_PXA
+	select PXA_SSP_LEGACY
 	help
 	  Support for Marvell's PXA168/PXA910(MMP) and MMP2 processor line.
 
@@ -1031,8 +1034,9 @@ source "arch/arm/common/Kconfig"
 
 config FORCE_MAX_ZONEORDER
 	int
-	depends on SA1111
-	default "9"
+	depends on SA1111 || ARCH_MMP
+	default "9" if SA1111
+	default "15" if ARCH_MMP
 
 menu "Bus support"
 
@@ -1058,7 +1062,7 @@ config ISA_DMA_API
 	bool
 
 config PCI
-	bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB || ARCH_IXP4XX || ARCH_KS8695 || MACH_ARMCORE
+	bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB || ARCH_IXP4XX || ARCH_KS8695 || MACH_ARMCORE || ARCH_MMP
 	help
 	  Find out whether you have a PCI motherboard. PCI is the name of a
 	  bus system, i.e. the way the CPU talks to the other stuff inside
@@ -1182,6 +1186,7 @@ config HZ
 	default 200 if ARCH_EBSA110 || ARCH_S3C2410 || ARCH_S5P6440 || ARCH_S5P6442 || ARCH_S5PV210
 	default OMAP_32K_TIMER_HZ if ARCH_OMAP && OMAP_32K_TIMER
 	default AT91_TIMER_HZ if ARCH_AT91
+	default 128 if ARCH_MMP && PXA_32KTIMER
 	default 100
 
 config THUMB2_KERNEL
@@ -1644,6 +1649,94 @@ source "kernel/power/Kconfig"
 
 config ARCH_SUSPEND_POSSIBLE
 	def_bool y
+
+config PM_PXA168
+	bool "PXA168 PM support (hibernate)"
+	depends on PM && CPU_PXA168
+	default y
+	help
+	  Say 'Y' here if you want hibernate support
+
+config PM_PXA910
+	bool "PXA910 PM support"
+	depends on PM && CPU_PXA910
+	default y
+	help
+	  Say 'Y' here if you want low power mode support
+
+config DVFM
+	bool "DVFM support"
+	depends on PM
+	default y
+	help
+	  Say 'Y' here if you want Dynamic Voltage and Frequency Management
+
+config DVFM_PXA168
+	bool "PXA168 DVFM support"
+	depends on DVFM && CPU_PXA168
+	default y
+	help
+	  Say 'Y' here if you want DVFM on PXA168 processor
+
+config DVFM_PXA168_LCDDMA_WR
+	bool "PXA168 DFC & LCD DMA confliction work around"
+	depends on DVFM_PXA168
+	default y
+	help
+	  Say 'Y' here if you want add the DFC & LCD DAM confliction WR
+
+
+config DVFM_PXA910
+	bool "PXA910 DVFM support"
+	depends on DVFM && CPU_PXA910
+	default n
+	help
+	  Say 'Y' here if you want DVFM on PXA910 processor
+
+config MSPM
+	bool "Marvell Scalable Power Management support"
+	depends on DVFM_PXA168 || DVFM_PXA910
+	default y
+	help
+	  Say 'Y' here if you want Marvell Scalable Power Management
+
+config MSPM_PXA168
+	bool "PXA168 MSPM support"
+	depends on MSPM && DVFM_PXA168 && PM_PXA168
+	default y
+	help
+	  Say 'Y' here if you want Marvell Scalable Power Management
+
+config MSPM_PXA168_STATS
+	bool "PXA168 MSPM Statistics support"
+	depends on MSPM && DVFM_PXA168 && PM_PXA168
+	select RELAY
+	select DEBUG_FS
+	default y
+	help
+	  This is used to collect statistics during the dynamic frequency
+	  and voltage changes
+
+config MSPM_PXA910
+	bool "PXA910 MSPM support"
+	depends on MSPM && DVFM_PXA910 && PM_PXA910
+	default y
+	help
+	  Say 'Y' here if you want Marvell Scalable Power Management
+
+config PXA910_DVFM_STATS
+	bool "PXA910 DVFM STATS"
+	depends on MSPM_PXA910
+	default n
+	help
+	  Say 'Y' here if you want DVFM STATS
+
+config PXA910_CLOCK_TRACE
+	bool "PXA910 ACTIVE CLOCK TRACE"
+	depends on MSPM_PXA910
+	default n
+	help
+	  Say 'Y' here if you want DVFM STATS
 
 endmenu
 

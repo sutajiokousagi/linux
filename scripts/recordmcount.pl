@@ -268,6 +268,7 @@ if ($arch eq "x86_64") {
 } elsif ($arch eq "arm") {
     $alignment = 2;
     $section_type = '%progbits';
+    $mcount_regex = "^\\s*([0-9a-fA-F]+):.*\\s(__gnu_)*mcount(_nc)*\$";
 
 } elsif ($arch eq "ia64") {
     $mcount_regex = "^\\s*([0-9a-fA-F]+):.*\\s_mcount\$";

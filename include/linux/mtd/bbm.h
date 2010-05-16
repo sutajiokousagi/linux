@@ -118,8 +118,6 @@ struct bbm_info {
 
 	uint8_t *bbt;
 
-	int (*isbad_bbt)(struct mtd_info *mtd, loff_t ofs, int allowbbt);
-
 	/* TODO Add more NAND specific fileds */
 	struct nand_bbt_descr *badblock_pattern;
 
@@ -129,5 +127,6 @@ struct bbm_info {
 /* OneNAND BBT interface */
 extern int onenand_scan_bbt(struct mtd_info *mtd, struct nand_bbt_descr *bd);
 extern int onenand_default_bbt(struct mtd_info *mtd);
+extern int onenand_isbad_bbt(struct mtd_info *mtd, loff_t offs, int allowbbt);
 
 #endif	/* __LINUX_MTD_BBM_H */

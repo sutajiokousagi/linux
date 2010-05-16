@@ -353,7 +353,12 @@ unsigned int mmc_align_data_size(struct mmc_card *card, unsigned int sz)
 	 * the core about its problems yet, so for now we just 32-bit
 	 * align the size.
 	 */
+#ifdef S0_HARDWARE_BROKEN
+#warning ALIGN XFER TO 8 BYTES
+	sz = ((sz + 7) / 8) * 8;
+#else
 	sz = ((sz + 3) / 4) * 4;
+#endif
 
 	return sz;
 }

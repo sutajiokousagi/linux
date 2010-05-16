@@ -3,15 +3,18 @@
 #include <linux/module.h>
 #include <linux/major.h>
 
-#define PSMOUSE_MINOR		1
-#define MS_BUSMOUSE_MINOR	2
-#define ATIXL_BUSMOUSE_MINOR	3
-/*#define AMIGAMOUSE_MINOR	4	FIXME OBSOLETE */
-#define ATARIMOUSE_MINOR	5
-#define SUN_MOUSE_MINOR		6
-#define APOLLO_MOUSE_MINOR	7
-#define PC110PAD_MINOR		9
-/*#define ADB_MOUSE_MINOR	10	FIXME OBSOLETE */
+#define PSMOUSE_MINOR  1
+#define MS_BUSMOUSE_MINOR 2
+#define ATIXL_BUSMOUSE_MINOR 3
+/*#define AMIGAMOUSE_MINOR 4	FIXME OBSOLETE */
+#define ATARIMOUSE_MINOR 5
+#define SUN_MOUSE_MINOR 6
+#define APOLLO_MOUSE_MINOR 7
+#define PC110PAD_MINOR 9
+/*#define ADB_MOUSE_MINOR 10	FIXME OBSOLETE */
+#define IMM_MINOR 91
+#define ACIPC_MINOR		99
+#define PXA910_IRE_MINOR	103
 #define WATCHDOG_MINOR		130	/* Watchdog timer     */
 #define TEMP_MINOR		131	/* Temperature Sensor */
 #define RTC_MINOR		135
