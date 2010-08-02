@@ -19,7 +19,7 @@
 #include <linux/mtd/nand.h>
 #include <linux/mtd/partitions.h>
 #include <linux/android_pmem.h>
-#include <linux/usb/android.h>
+#include <linux/usb/android_composite.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -1086,9 +1086,22 @@ static void avenger_lite_power_off(void)
 	while (1);
 }
 
+#define NUM_ANDROID_USB_FUNCTIONS 2
+char *android_usb_functions[NUM_ANDROID_USB_FUNCTIONS] = {
+	"adb",
+	"usb_mass_storage"
+};
+
 /* android usb adb device data */
 static struct android_usb_platform_data android_data = {
-	.nluns = 2,
+	.product_id = 0x0c02,
+	.vendor_id = 0x0bb4,
+	.product_name = "Avengers_lite",
+	.manufacturer_name = "Marvell",
+	.num_products = 0,
+	.products = NULL,
+	.num_functions = NUM_ANDROID_USB_FUNCTIONS,
+	.functions = android_usb_functions,
 };
 
 static struct platform_device android_usb = {
@@ -1098,9 +1111,23 @@ static struct platform_device android_usb = {
 	},
 };
 
+/* Platform data for "usb_mass_storage" driver. */
+static struct usb_mass_storage_platform_data usb_mass_storage_data = {
+	/* number of LUNS */
+	.nluns = 2
+};
+
+static struct platform_device usb_mass_storage = {
+	.name = "usb_mass_storage",
+	.dev  = {
+		.platform_data = &usb_mass_storage_data,
+	},
+};
+
 static void __init android_init(void)
 {
 	platform_device_register(&android_usb);
+	platform_device_register(&usb_mass_storage);
 }
 
 static void avengers_sel_debug(void)
