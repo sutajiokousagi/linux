@@ -545,8 +545,18 @@ __mohawk_setup:
 	mov	r5, r5, lsr #28
 	cmp	r5, #0xa			@ check TTC A0 stepping or not
 	orrne	r0, r0, #(1 << 26)		@ L2 enable - xscale/PJ41/PJ4
+
+	@ Must also pre-enable L2 cache _before_ L1 is enabled
+	mrcne	p15, 0, r5, c1, c0, 0		@ read control reg
+	orrne	r5, r5, #(1 << 26)		@ L2 enable - PJ1
+	mcrne	p15, 0, r5, c1, c0, 0		@ write control reg
 #else
 	orr	r0, r0, #(1 << 26)		@ L2 enable - xscale/PJ41/PJ4
+
+	@ Must also pre-enable L2 cache _before_ L1 is enabled
+	mrc	p15, 0, r5, c1, c0, 0		@ read control reg
+	orr	r5, r5, #(1 << 26)		@ L2 enable - PJ1
+	mcr	p15, 0, r5, c1, c0, 0		@ write control reg
 #endif
 #endif
 	mrc	p15, 1, r5, c15, c1, 0		@ get extra features register
