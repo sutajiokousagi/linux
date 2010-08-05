@@ -2641,9 +2641,6 @@ static int ov7740_command(struct i2c_client *client, unsigned int cmd,
 	case VIDIOC_INT_RESET:
 		return ov7740_reset(client);
 
-	case VIDIOC_INT_INIT:
-		return ov7740_init(client);
-
 	case VIDIOC_CROPCAP:
 		return ov7740_cropcap(client, (struct v4l2_cropcap *)arg);
 
