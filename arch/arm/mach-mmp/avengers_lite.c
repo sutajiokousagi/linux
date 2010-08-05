@@ -1087,10 +1087,8 @@ static void avenger_lite_power_off(void)
 }
 
 #define NUM_ANDROID_USB_FUNCTIONS 2
-char *android_usb_functions[NUM_ANDROID_USB_FUNCTIONS] = {
-	"adb",
-	"usb_mass_storage"
-};
+char *android_usb_functions[NUM_ANDROID_USB_FUNCTIONS]
+	= {"usb_mass_storage", "adb"};
 
 /* android usb adb device data */
 static struct android_usb_platform_data android_data = {
