@@ -21,9 +21,6 @@
 #include <mach/pxa168_pcie.h>
 #include <mach/irqs.h>
 #include <mach/regs-pcie.h>
-#if defined(CONFIG_PROC_FS)
-#include <linux/proc_fs.h>
-#endif
 #include "common.h"
 
 /* #define PCIE_DEBUG_CODE */
@@ -123,7 +120,7 @@ pxa168_pcie_read_reg(void __iomem * base, u8 is_conf_read, u32 addr,
 	int i;
 	u8 data_strobe;
 	u32 aligned_addr;
-	unsigned long flags;
+	unsigned long flags = 0;
 	unsigned int channel;
 
 	aligned_addr = addr & ~0x3;	/* Align to DWORD */
@@ -140,8 +137,16 @@ pxa168_pcie_read_reg(void __iomem * base, u8 is_conf_read, u32 addr,
 		break;
 	}
 	/* Next channel */
-	channel = atomic_inc_return(&ch) % NUM_PCIE_CHANNELS;
-	spin_lock_irqsave(&channel_lock[channel], flags);
+	for (i = 0; i < NUM_PCIE_CHANNELS; i++) {
+		channel = atomic_inc_return(&ch) % NUM_PCIE_CHANNELS;
+		/* If lock is available or all channel locks were taken  */
+		if ((!spin_trylock(&channel_lock[channel])) ||
+		    (i >= NUM_PCIE_CHANNELS)) {
+			/* then get the lock for a channel */
+			spin_lock_irqsave(&channel_lock[channel], flags);
+			break;
+		}
+	}
 
 	/* Configure Channel DMA PCI-E Control Register with
 	 * Read Type (Configuration or Memory Read)*/
@@ -198,13 +203,11 @@ pxa168_pcie_read_reg(void __iomem * base, u8 is_conf_read, u32 addr,
 	} else {
 		spin_unlock_irqrestore(&channel_lock[channel], flags);
 		PCIE_DEBUG("Error: PIO register read timeout\n");
-		val = 0;
+		val = -1;
 	}
 
 	return val;
 }
-
-EXPORT_SYMBOL(pxa168_pcie_read_reg);
 
 static void pxa168_pcie_write_reg(void __iomem * base, u8 is_conf_write,
 				  u32 addr, u8 size, u32 val)
@@ -214,7 +217,7 @@ static void pxa168_pcie_write_reg(void __iomem * base, u8 is_conf_write,
 	u8 data_strobe;
 	u32 aligned_addr;
 	u32 aligned_val = val;
-	unsigned long flags;
+	unsigned long flags = 0;
 	unsigned int channel;
 
 	aligned_addr = addr & ~0x3;	/* Align to DWORD */
@@ -234,9 +237,18 @@ static void pxa168_pcie_write_reg(void __iomem * base, u8 is_conf_write,
 		data_strobe = 0xf;	/* Size 32 */
 		break;
 	}
+
 	/* Next channel */
-	channel = atomic_inc_return(&ch) % NUM_PCIE_CHANNELS;
-	spin_lock_irqsave(&channel_lock[channel], flags);
+	for (i = 0; i < NUM_PCIE_CHANNELS; i++) {
+		channel = atomic_inc_return(&ch) % NUM_PCIE_CHANNELS;
+		/* If lock is available or all channel locks were taken  */
+		if ((!spin_trylock(&channel_lock[channel])) ||
+		    (i >= NUM_PCIE_CHANNELS)) {
+			/* then get the lock for a channel */
+			spin_lock_irqsave(&channel_lock[channel], flags);
+			break;
+		}
+	}
 
 	/* Configure Channel DMA PCI-E Control Register with
 	 * Write Type (Configuration or Memory Write)*/
@@ -286,8 +298,6 @@ static void pxa168_pcie_write_reg(void __iomem * base, u8 is_conf_write,
 	spin_unlock_irqrestore(&channel_lock[channel], flags);
 }
 
-EXPORT_SYMBOL(pxa168_pcie_write_reg);
-
 u8 pxa168_pcie_read8(u32 addr)
 {
 	return (u8) pxa168_pcie_read_reg(0, IO_MEM, addr, SIZE_8);
@@ -336,16 +346,15 @@ static void pxa168_pcie_enable_link(void)
 	 * Enable ANALOG_CTRL register in PCI-E PHY. This
 	 * should supposedly be the only register among the PCI-E
 	 * PHY registers based on DE's. Set bit 7:6 to 0x01 (0.9 ns)
-	 * However this setting isn't part of XDB Test Scripts.
 	 */
 	temp = __raw_readl(PCIE_REG(PCIE_PHY_ANALOG_CTRL));
 	temp &= ~0x000000f0;
 	temp |= 0x50;
 	__raw_writel(temp, PCIE_REG(PCIE_PHY_ANALOG_CTRL));	/* 0.9ns */
 
-	/* Advertise itself as Gen 1 at Link Capability Register */
-	__raw_writel((__raw_readl(PCIE_REG(0x307C)) & 0xFFFFFFF0) | 0x1,
-		     PCIE_REG(0x307C));
+	/* Advertise as Gen 1 at Link Capability Register */
+	__raw_writel((__raw_readl(PCIE_REG(PCIE_CFG_PCIE_CAP + 0xC)) &
+		      0xFFFFFFF0) | 0x1, PCIE_REG(PCIE_CFG_PCIE_CAP + 0xC));
 
 	/*
 	 * Magic Register settings to init PCI-E Link
@@ -353,9 +362,9 @@ static void pxa168_pcie_enable_link(void)
 	 */
 
 	/* Program RC memory limit and base */
-	__raw_writel(0x90008000, PCIE_REG(0x3020));
+	__raw_writel(0x90008000, PCIE_STD_PCI_CFG_REG(0x20));
 	/* Program RC prefechable memory limit and base */
-	__raw_writel(0xB000A000, PCIE_REG(0x3024));
+	__raw_writel(0xB000A000, PCIE_STD_PCI_CFG_REG(0x24));
 
 	/* Sets the default link number to zero since we have just one port */
 	__raw_writel((__raw_readl(PCIE_REG(0x3708)) & 0xFFFFFF00),
@@ -368,17 +377,17 @@ static void pxa168_pcie_enable_link(void)
 		     PCIE_REG(0x3118));
 
 	/* Disable L0s - Power Management */
-	__raw_writel(0x00000000, PCIE_REG(0x3080));
+	__raw_writel(0x00000000, PCIE_CFG_PCIE_CAP_REG(0x10));
 
 	/* Set device into active mode - D0 state  */
-	__raw_writel((__raw_readl(PCIE_REG(0x3044)) & 0xFFFFFFFC),
-		     PCIE_REG(0x3044));
+	__raw_writel((__raw_readl(PCIE_CFG_PM_CAP_REG(0x04)) & 0xFFFFFFFC),
+		     PCIE_CFG_PM_CAP_REG(0x04));
 
 	/* Enable the memory space and bus master on Control Register */
-	__raw_writel(0x6, PCIE_REG(0x3004));
+	__raw_writel(0x6, PCIE_STD_PCI_CFG_REG(0x04));
 
 	/* Bus number register */
-	__raw_writel(0x00010100, PCIE_REG(0x3018));
+	__raw_writel(0x00010100, PCIE_STD_PCI_CFG_REG(0x18));
 
 	/* Enable LTSSM */
 	__raw_writel(0x1, PCIE_REG(PCIE_CTRL0));
@@ -389,8 +398,7 @@ int pxa168_pcie_link_up(void)
 	unsigned int count = 0;
 	unsigned int ret = 1;
 
-	while (!(((__raw_readl(PCIE_REG(PCIE_ISR0)) & 0xc0000000)
-		  == 0xc0000000) ? 1 : 0)) {
+	while (!(__raw_readl(PCIE_REG(PCIE_ISR0)) & 0xc0000000)) {
 		udelay(LINKUP_DELAY);
 		count++;
 		if (count == LINKUP_TIMEOUT) {
@@ -408,28 +416,6 @@ int pxa168_pcie_link_up(void)
 	return ret;
 }
 
-#if 0
-static int __init pxa168_pcie_x4_mode(void __iomem * base)
-{
-	/* TODO - Read CFG_PCIE_CAP + 0x0C to
-	 * determine Linkwidth */
-	return 0;
-}
-#endif
-
-#if 0
-static int pxa168_pcie_get_local_bus_nr(void __iomem * base)
-{
-	u8 val;
-
-	/* Read Configuration Space Type1 Header (Offset 0x18)
-	 * through DBI */
-	val = __raw_readb(PCIE_REG(0x3018));
-
-	return val;
-}
-#endif
-
 static void pxa168_pcie_set_local_bus_nr(int nr)
 {
 	/* Write Configuration Space Type1 Header (Offset 0x18)
@@ -439,7 +425,7 @@ static void pxa168_pcie_set_local_bus_nr(int nr)
 	return;
 }
 
-int pxa168_pcie_rd_conf(void __iomem * base, struct pci_bus *bus,
+static int pxa168_pcie_rd_conf(void __iomem *base, struct pci_bus *bus,
 			u32 devfn, int where, int size, u32 * val)
 {
 	u32 conf_addr;
@@ -470,7 +456,7 @@ int pxa168_pcie_rd_conf(void __iomem * base, struct pci_bus *bus,
 	return PCIBIOS_SUCCESSFUL;
 }
 
-int pxa168_pcie_wr_conf(void __iomem * base, struct pci_bus *bus,
+static int pxa168_pcie_wr_conf(void __iomem *base, struct pci_bus *bus,
 			u32 devfn, int where, int size, u32 val)
 {
 	int ret = PCIBIOS_SUCCESSFUL;
@@ -601,16 +587,6 @@ static void __init add_pcie_port(void)
 	pxa168_pcie_enable_link();
 
 	pcie_channel_data_init();
-}
-
-u32 __init pxa168_pcie_dev_id(void __iomem * base)
-{
-	return pxa168_pcie_read_reg(base, CONFIG_MEM, 0x0, 4);
-}
-
-u32 __init pxa168_pcie_rev(void __iomem * base)
-{
-	return pxa168_pcie_read_reg(base, CONFIG_MEM, 0x8, 4);
 }
 
 #if defined(CONFIG_PM)

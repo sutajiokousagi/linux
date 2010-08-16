@@ -51,23 +51,6 @@
 #endif
 
 #include "sky2.h"
-#if defined(CONFIG_MACH_ASPENITE)
-
-extern void _pxa168_memcpy_toio(volatile void __iomem *to, const void *from,
-				size_t count);
-extern void _pxa168_memcpy_fromio(void *to, const volatile void __iomem *from,
-				  size_t count);
-extern void _pxa168_memset_io(volatile void __iomem *dst, int c, size_t count);
-
-#undef memset_io
-#undef memcpy_fromio
-#undef memcpy_toio
-
-
-#define memset_io(c,v,l)	_pxa168_memset_io(__mem_pci(c),(v),(l))
-#define memcpy_fromio(a,c,l)	_pxa168_memcpy_fromio((a),__mem_pci(c),(l))
-#define memcpy_toio(c,a,l)	_pxa168_memcpy_toio(__mem_pci(c),(a),(l))
-#endif
 
 #define DRV_NAME		"sky2"
 #define DRV_VERSION		"1.27"
@@ -171,25 +154,6 @@ static const unsigned rxqaddr[] = { Q_R1, Q_R2 };
 static const u32 portirq_msk[] = { Y2_IS_PORT_1, Y2_IS_PORT_2 };
 
 static void sky2_set_multicast(struct net_device *dev);
-
-
-static void *sky2_map_regs_base(struct pci_dev *pdev)
-{
-#if defined(CONFIG_MACH_ASPENITE)
-	/* We shouldn't map an address that only the controller understands */
-	return (void *) pci_resource_start(pdev, 0);
-#else
-	return ioremap_nocache(pci_resource_start(pdev, 0), 0x4000);
-#endif
-}
-
-static void sky2_unmap_regs_base(void *addr)
-{
-	/* No need to unmap is Aspenite */
-#if !defined(CONFIG_MACH_ASPENITE)
-	iounmap(addr);
-#endif
-}
 
 /* Access to PHY via serial interconnect */
 static int gm_phy_write(struct sky2_hw *hw, unsigned port, u16 reg, u16 val)
@@ -2918,14 +2882,16 @@ done:
 static irqreturn_t sky2_intr(int irq, void *dev_id)
 {
 	struct sky2_hw *hw = dev_id;
-	u32 status, stat;
+	u32 status;
 
+#if defined(CONFIG_MACH_ASPENITE)
 	/* TODO: Hack alert!! Fix it!
 	 * Clears the interrupts on the PCIe controller
 	 * Should this be a call back into
 	 * arch/arm/mach-mmp/pxa168_pcie.c?
 	 */
-#if defined(CONFIG_MACH_ASPENITE)
+	u32 stat;
+
 	stat = __raw_readl(0xfee01820);
 
 	/* Clear interrupts only TLP de-assert message */
@@ -3651,7 +3617,6 @@ static int sky2_set_mac_address(struct net_device *dev, void *p)
 		return -EADDRNOTAVAIL;
 
 	memcpy(dev->dev_addr, addr->sa_data, ETH_ALEN);
-
 	memcpy_toio(hw->regs + B2_MAC_1 + port * 8,
 		    dev->dev_addr, ETH_ALEN);
 	memcpy_toio(hw->regs + B2_MAC_2 + port * 8,
@@ -4732,12 +4697,9 @@ static int __devinit sky2_probe(struct pci_dev *pdev,
 	}
 
 	hw->pdev = pdev;
-<<<<<<< HEAD:drivers/net/sky2.c
-	hw->regs = sky2_map_regs_base(pdev);
-=======
 	sprintf(hw->irq_name, DRV_NAME "@pci:%s", pci_name(pdev));
->>>>>>> e40152ee1e1c7a63f4777791863215e3faa37a86:drivers/net/sky2.c
 
+	hw->regs = ioremap_nocache(pci_resource_start(pdev, 0), 0x4000);
 	if (!hw->regs) {
 		dev_err(&pdev->dev, "cannot map device registers\n");
 		goto err_out_free_hw;
@@ -4828,7 +4790,7 @@ err_out_free_pci:
 	sky2_write8(hw, B0_CTST, CS_RST_SET);
 	pci_free_consistent(pdev, STATUS_LE_BYTES, hw->st_le, hw->st_dma);
 err_out_iounmap:
-	sky2_unmap_regs_base(hw->regs);
+	iounmap(hw->regs);
 err_out_free_hw:
 	kfree(hw);
 err_out_free_regions:
@@ -4871,7 +4833,7 @@ static void __devexit sky2_remove(struct pci_dev *pdev)
 	for (i = hw->ports-1; i >= 0; --i)
 		free_netdev(hw->dev[i]);
 
-	sky2_unmap_regs_base(hw->regs);
+	iounmap(hw->regs);
 	kfree(hw);
 
 	pci_set_drvdata(pdev, NULL);

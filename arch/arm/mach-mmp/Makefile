@@ -30,6 +30,6 @@ obj-$(CONFIG_PM_PXA168)		+= pxa168_pm.o pxa168_pm_ll.o
 obj-$(CONFIG_PM_PXA910)		+= pxa910_pm.o pxa910_pm_ll.o
 obj-$(CONFIG_TIMER_SERVICES_MMP)+= timer_services.o
 obj-$(CONFIG_MMC)		+= mmc.o
-obj-$(CONFIG_PCI)		+= pxa168_pcie.o io.o
+obj-$(CONFIG_PCI)		+= pxa168_pcie.o
 obj-$(CONFIG_MACH_FLINT)	+= flint.o
 obj-$(CONFIG_MACH_MARVELL_JASPER) += jasper.o

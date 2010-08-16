@@ -14,7 +14,5 @@ extern u32 pxa168_pcie_read32(u32 addr);
 extern void pxa168_pcie_write8(u8 val, u32 addr);
 extern void pxa168_pcie_write16(u16 val, u32 addr);
 extern void pxa168_pcie_write32(u32 val, u32 addr);
-extern u32 __init pxa168_pcie_dev_id(void __iomem * base);
-extern u32 __init pxa168_pcie_rev(void __iomem * base);
 
 #endif				/* __LINUX_PXA168_PCIE_H */

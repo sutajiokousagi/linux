@@ -180,6 +180,8 @@
 #define PCIE_CFG_SLOT_CAP 0x30C0
 #define PCIE_CFG_VPD_CAP  0x30D0
 
+#define PCIE_STD_PCI_CFG_REG(x)  ((void __iomem *)(PCIE_REG(PCIE_STD_PCI_CFG) \
+						   + (x)))
 #define PCIE_CFG_PM_CAP_REG(x)   ((void __iomem *)(PCIE_REG(PCIE_CFG_PM_CAP) \
 						   + (x)))
 #define PCIE_CFG_MSI_CAP_REG(x)  ((void __iomem *)(PCIE_REG(PCIE_CFG_MSI_CAP) \
