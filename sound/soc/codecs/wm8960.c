@@ -154,6 +154,9 @@ SOC_SINGLE_TLV("Right Output Mixer Boost Bypass Volume",
 	       WM8960_BYPASS2, 4, 7, 1, bypass_tlv),
 SOC_SINGLE_TLV("Right Output Mixer RINPUT3 Volume",
 	       WM8960_ROUTMIX, 4, 7, 1, bypass_tlv),
+SOC_DOUBLE_R("Headphone Volume Update Now", WM8960_LOUT1, WM8960_ROUT1,
+	8, 1, 0),
+SOC_DOUBLE_R("Speaker Volume Update Now", WM8960_LOUT2, WM8960_ROUT2, 8, 1, 0),
 };
 
 static const struct snd_kcontrol_new wm8960_lin_boost[] = {
@@ -416,6 +419,10 @@ static int wm8960_set_bias_level(struct snd_soc_codec *codec,
 
 	switch (level) {
 	case SND_SOC_BIAS_ON:
+		/* setting for HP autodetection */
+		snd_soc_write(codec, WM8960_ADDCTL2 , 0x40);
+		snd_soc_write(codec, WM8960_ADDCTL4 , 0x8);
+		snd_soc_write(codec, WM8960_ADDCTL1 , 0x3);
 		break;
 
 	case SND_SOC_BIAS_PREPARE:
@@ -807,14 +814,11 @@ static int wm8960_register(struct wm8960_priv *wm8960,
 	snd_soc_write(codec, WM8960_LDAC, reg | 0x100);
 	reg = snd_soc_read(codec, WM8960_RDAC);
 	snd_soc_write(codec, WM8960_RDAC, reg | 0x100);
-	reg = snd_soc_read(codec, WM8960_LOUT1);
-	snd_soc_write(codec, WM8960_LOUT1, reg | 0x100);
-	reg = snd_soc_read(codec, WM8960_ROUT1);
-	snd_soc_write(codec, WM8960_ROUT1, reg | 0x100);
 	reg = snd_soc_read(codec, WM8960_LOUT2);
 	snd_soc_write(codec, WM8960_LOUT2, reg | 0x100);
 	reg = snd_soc_read(codec, WM8960_ROUT2);
 	snd_soc_write(codec, WM8960_ROUT2, reg | 0x100);
+
 
 	wm8960_codec = codec;
 
