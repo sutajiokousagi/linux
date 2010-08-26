@@ -230,37 +230,34 @@ void pxa168_mfp_set_fastio_drive(int type)
 {
 	switch (type) {
 	/* pxa168 mfpr drive strength for fast IO pins[56:85]:
-	 * ZR[0] = MFPR57[10] & MFPR59[10]
-	 * ZR[1] = MFPR56[11] & MFPR58[11]
-	 * ZR[2] = MFPR56[10] & MFPR58[10]
+	 * ZPR[1] = MFPR58[11]
+	 * ZPR[2] = MFPR58[10]
+	 * ZNR[1] = MFPR56[11]
+	 * ZNR[2] = MFPR56[10]
 	 */
 	case MFP_DS01X:
-		/* ZR[0] = ZR[1] = 0 */
-		mfp_clr(57, 1<<10);
-		mfp_clr(59, 1<<10);
-		mfp_clr(56, 1<<11);
-		mfp_clr(58, 1<<11);
+		/* ZPR[2:1] = ZNR[2:1] = 0b00 */
+		mfp_clr(56, 3<<10);
+		mfp_clr(58, 3<<10);
 		break;
 	case MFP_DS02X:
-		/* ZR[0] = 0, ZR[1] = 1 */
-		mfp_clr(57, 1<<10);
-		mfp_clr(59, 1<<10);
+		/* ZPR[2:1] = ZNR[2:1] = 0b01 */
+		mfp_clr(56, 1<<10);
 		mfp_set(56, 1<<11);
+		mfp_clr(58, 1<<10);
 		mfp_set(58, 1<<11);
 		break;
 	case MFP_DS03X:
-		/* ZR[0] = 1, ZR[1] = 0 */
-		mfp_set(57, 1<<10);
-		mfp_set(59, 1<<10);
+		/* ZPR[2:1] = ZNR[2:1] = 0b10 */
+		mfp_set(56, 1<<10);
 		mfp_clr(56, 1<<11);
+		mfp_set(58, 1<<10);
 		mfp_clr(58, 1<<11);
 		break;
 	case MFP_DS04X:
-		/* ZR[0] = ZR[1] = 1 */
-		mfp_set(57, 1<<10);
-		mfp_set(59, 1<<10);
-		mfp_set(56, 1<<11);
-		mfp_set(58, 1<<11);
+		/* ZPR[2:1] = ZNR[2:1] = 0b11 */
+		mfp_set(56, 3<<10);
+		mfp_set(58, 3<<10);
 		break;
 	default:
 		pr_err("drv type %d not supported\n", type);
