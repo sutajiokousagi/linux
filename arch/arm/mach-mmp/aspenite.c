@@ -1350,6 +1350,7 @@ static int aspenite_u2o_vbus_status(unsigned base)
 	/* FIXME on aspenite R0 boards otg stat1/stat2 could not
 	 * reflect VBUS status yet, check with U2O itself instead
 	 */
+	mdelay(2);
 	if (u2o_get(base, U2xOTGSC) & U2xOTGSC_BSV)
 		status = VBUS_HIGH;
 	else
