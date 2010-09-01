@@ -1290,10 +1290,12 @@ static int pxa168_freq_probe(struct platform_device *pdev)
 			0xd4282800, apmu_temp);
 	}
 
+#if !defined(CONFIG_PCI)
 	/* bits 9:8 should be set to allow for PCIe powerdown to assert */
 	apmu_temp = readl(info->pmua_base);
 	apmu_temp |= 0x300;
 	writel(apmu_temp, info->pmua_base);
+#endif
 
 	if (op_init(info, &pxa168_dvfm_op_list))
 		goto err;
