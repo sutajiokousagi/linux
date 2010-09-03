@@ -118,6 +118,8 @@ struct dvfm_driver {
 	int	(*set)(void *driver_data, struct dvfm_freqs *freq, unsigned int new,
 			unsigned int relation);
 	int	(*dump)(void *driver_data, struct op_info *md, char *buf);
+	int	(*modify)(void *driver_data, struct op_info *md, char *buf);
+	int	(*modify_help)(void *driver_data);
 	char *	(*name)(void *driver_data, struct op_info *md);
 	int	(*request_set)(void *driver_data, int index);
 	int	(*enable_dvfm)(void *driver_data, int dev_id);

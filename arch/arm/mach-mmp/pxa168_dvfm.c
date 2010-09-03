@@ -54,6 +54,9 @@ static struct info_head pxa168_dvfm_op_list = {
 	.lock = RW_LOCK_UNLOCKED,
 };
 
+/* dvfm_op_set: set to true when any opmode is selected. */
+static int dvfm_op_set;
+
 /* the operating point preferred by policy maker or user */
 static int preferred_op;
 
@@ -322,28 +325,53 @@ static int dump_op(void *driver_data, struct op_info *p, char *buf)
 {
 	int len, count, x, i, max, sum;
 	struct pxa168_md_opt *q = (struct pxa168_md_opt *)p->op;
-	/*struct pxa168_dvfm_info *info = driver_data;
-	struct pxa168_md_opt md_opt_temp;
-	struct pxa168_opmode_md opmode_md_temp;*/
+	struct pxa168_opmode_md *md;
 
 	if (q == NULL)
 		len = sprintf(buf, "Can't dump the op info\n");
 	else {
-		/* calculate how much bits is set in device word */
-		max = DVFM_MAX_CLIENT >> 5;
-		for (i = 0, sum = 0; i < max; i++) {
-			x = p->device[i];
-			for (count = 0; x; x = x & (x - 1), count++);
-			sum += count;
+		if (dvfm_op_set) {
+			/* calculate how much bits is set in device word */
+			max = DVFM_MAX_CLIENT >> 5;
+			for (i = 0, sum = 0; i < max; i++) {
+				x = p->device[i];
+				for (count = 0; x; x = x & (x - 1), count++)
+					;
+				sum += count;
+			}
+			len = sprintf(buf, "OP:%d name:%s [%s, %d]\n",
+					p->index, q->name, (sum) ? "Disabled"
+					: "Enabled", sum);
+		} else {
+			len = sprintf(buf,
+					  "Op not set. "
+					  "Use 'echo # > op' first.\n"
+					  "Example: To select mode 0 enter:\n"
+					  "  echo 0 > op\n"
+					  "Current register settings are:\n"
+					);
 		}
-		len = sprintf(buf, "OP:%d name:%s [%s, %d]\n",
-				p->index, q->name, (sum)?"Disabled"
-				:"Enabled", sum);
-		if (q->power_mode == POWER_MODE_ACTIVE)
+
+		if (q->power_mode == POWER_MODE_ACTIVE) {
 			len += sprintf(buf + len, "pclk:%d baclk:%d xpclk:%d "
 				"dclk:%d aclk:%d aclk2:%d vcc_core:%d\n",
 				q->pclk, q->baclk, q->xpclk,
 				q->dclk, q->aclk, q->aclk2, q->vcc_core);
+			md = q->dvfm_settings;
+			len += sprintf(buf + len,
+				"cp:%d ap:%d a1d:%d a2d:%d dcd:%d "
+				"xpd:%d bad:%d pcd:%d 2r:%d 2f:%d 21:%08x\n",
+				md->corepll_sel, md->axipll_sel,
+				md->aclk_div, md->aclk2_div,
+				md->dclk_div,
+				md->xpclk_div,
+				md->baclk_div,
+				md->pclk_div,
+				md->pll2_refdiv,
+				md->pll2_fbdiv,
+				md->pll2_reg1);
+
+		}
 	}
 
 	/* pxa168_get_current_opmode_md(info, &opmode_md_temp);
@@ -494,6 +522,184 @@ void pxa168_op_machine_to_human(struct pxa168_opmode_md  *opmode_md,
 	return;
 }
 
+static const char *modify_op_help_text =
+	"\n"
+	"display or configure operating mode parameters:\n"
+	"\n"
+	"  echo op_indx > ops\n"
+	"  echo op_indx parameter = value [parameter = value...] > ops\n"
+	"\n"
+	"where:\n"
+	"\n"
+	"  'op_indx' is the value following OP: in cat ops output.\n"
+	"\n"
+	"  'parameter' comes from the list below:\n"
+	"    corepll_sel - cp  from cat ops output\n"
+	"    axipll_sel  - ap  from cat ops output\n"
+	"    aclk2_div   - a2d from cat ops output\n"
+	"    aclk_div    - a1d from cat ops output\n"
+	"    dclk_div    - dcd from cat ops output\n"
+	"    xpclk_div   - xpd from cat ops output\n"
+	"    baclk_div   - bad from cat ops output\n"
+	"    pclk_div    - pcd from cat ops output\n"
+	"    pll2_refdiv - 2r  from cat ops output\n"
+	"    pll2_fbdiv  - 2f  from cat ops output\n"
+	"    pll2_reg1   - 21  from cat ops output\n"
+	"    vcc_core\n"
+	"    name\n"
+	"    power_mode  - 0 = active\n"
+	"                - 1 = core_intidle\n"
+	"                - 2 = core_extidle\n"
+	"                - 3 = apps_idle\n"
+	"                - 4 = apps_sleep\n"
+	"                - 5 = sys_sleep\n"
+	"                - 6 = hibernate\n"
+	"\n"
+;
+
+
+static const char *modify_op_help_example =
+	"The first format will only display parameters.\n"
+	"The second format is used to modify parameter values.\n"
+	"Example:\n"
+	"\n"
+	"  echo 3 vcc_core = 1105 name = mode2.3+ > ops\n"
+	"\n"
+	"will set the parameters for the operating mode corresponding to\n"
+	"OP:3. The core voltage will be set to 1105 mV, and the name of\n"
+	"the operating mode will be changed to 'mode2.3+'.\n"
+	"\n"
+;
+
+static int modify_op_help(void *driver_data)
+{
+	printk(KERN_ERR "%s", modify_op_help_text);
+	printk(KERN_ERR "%s", modify_op_help_example);
+	return 0;
+}
+
+static int modify_op(void *driver_data, struct op_info *p, char *buf)
+{
+	struct pxa168_md_opt *md_opt;
+	struct pxa168_opmode_md *md;
+
+	struct op_info op_info_save;
+	struct pxa168_md_opt md_opt_save;
+	struct pxa168_opmode_md md_save;
+
+	char	tok1[16], tok2[16], tok3[16];	/* *id, *=, *val */
+	int	rc;				/* rc=num fields parsed. */
+	int	cp;				/* cp=num chars read */
+
+	int	*pi;				/* addr of int to be changed */
+
+	char	dump_buf[256];
+	int	changed = 0;
+
+	md_opt = (struct pxa168_md_opt *)p->op;
+	if (md_opt == NULL) {
+		printk(KERN_ERR "\nmodify_op: Can't modify the op info\n");
+		return 0;
+	}
+	md = md_opt->dvfm_settings;
+
+	/* save the current contents so it can be printed at the end. */
+	md_save = *md;			/* save the register settings */
+	md_opt_save = *md_opt;		/* save the human-readable values */
+	md_opt_save.dvfm_settings = &md_save;	/* point back to local struct */
+	op_info_save = *p;
+	op_info_save.op = &md_opt_save;		/* point back to local struct */
+
+
+	/* part the input buffer. it will be a series of triplets: */
+	/* id = val                                                */
+	/* whitespace on either side of the = is mandatory.        */
+	while (1) {
+		rc = cp = 0;
+		*tok1 = *tok2 = *tok3 = '\0';
+		rc = sscanf(buf, " %s = %s%n", tok1, tok3, &cp);
+		if (rc == 0)		/* end of parameter list? */
+			break;
+		if (rc != 2) {		/* invalid syntax? */
+			printk(KERN_ERR "\ninvalid parameter list.\n");
+			printk(KERN_ERR "try echo help >ops\n");
+			break;	/* don't parse any more */
+		}
+
+		buf += cp;	/* get ready for next parse */
+
+		/* modify the selected field (identified in tok1 */
+		pi = NULL;
+		     if (!strcmp(tok1, "corepll_sel"))
+				pi = &md->corepll_sel;
+		else if (!strcmp(tok1, "axipll_sel"))
+				pi = &md->axipll_sel;
+		else if (!strcmp(tok1, "aclk2_div"))
+				pi = &md->aclk2_div;
+		else if (!strcmp(tok1, "aclk_div"))
+				pi = &md->aclk_div;
+		else if (!strcmp(tok1, "dclk_div"))
+				pi = &md->dclk_div;
+		else if (!strcmp(tok1, "xpclk_div"))
+				pi = &md->xpclk_div;
+		else if (!strcmp(tok1, "baclk_div"))
+				pi = &md->baclk_div;
+		else if (!strcmp(tok1, "pclk_div"))
+				pi = &md->pclk_div;
+		else if (!strcmp(tok1, "pll2_refdiv"))
+				pi = &md->pll2_refdiv;
+		else if (!strcmp(tok1, "pll2_fbdiv"))
+				pi = &md->pll2_fbdiv;
+		else if (!strcmp(tok1, "pll2_reg1"))
+				pi = &md->pll2_reg1;
+		else if (!strcmp(tok1, "vcc_core"))
+				pi = &md->vcc_core;
+		else if (!strcmp(tok1, "power_mode"))
+				pi = &md->power_mode;
+		else if (!strcmp(tok1, "name")) {
+			strcpy(md->name, tok3);
+			changed = 1;
+		} else {
+			printk(KERN_ERR "\nunrecognized parameter name: %s. "
+					"try echo help >ops\n", tok1);
+			break;	/* don't parse any more */
+		}
+
+		if (pi) {
+			rc = sscanf(tok3, "%u%n", pi, &cp);
+			if (rc == 1)
+				changed = 1;
+			else {
+				printk(KERN_ERR
+					"\ninvalid value for %s.\n", tok1);
+				break;	/* don't parse any more */
+			}
+		}
+
+	}
+
+
+	printk(KERN_ERR "\n%s opmode parameters:\n",
+		changed ? "previous" : "current");
+	dump_op(driver_data, &op_info_save, dump_buf);
+	printk(KERN_ERR "%s", dump_buf);
+	printk(KERN_ERR "\n");
+
+	if (changed) {
+		/* now that md has been modified, update the structure that */
+		/* contains the human readable values (md_opt)              */
+		pxa168_op_machine_to_human(md, md_opt);
+
+		printk(KERN_ERR "new opmode parameters:\n");
+		dump_op(driver_data, p, dump_buf);
+		printk(KERN_ERR "%s", dump_buf);
+	} else
+		printk(KERN_ERR "no changes made.\n");
+
+	return 0;
+}
+
+
 uint32_t pxa168_enable_swdfc(struct pxa168_dvfm_info *driver_data)
 {
 	uint32_t mpmu_acgr;
@@ -555,10 +761,9 @@ uint32_t pxa168_dfc_prepare(struct pxa168_dvfm_info *driver_data)
 	apmu_ccr |= (0xfu<<24);
 
 	apmu_temp = readl(info->pmua_base);
-	if(cpu_is_pxa168_A0()==0)
+	if (cpu_is_pxa168_A0() == 0)
 		apmu_temp |= 0x28000000;	/* not A stepping */
-	else
-	{
+	else {
 		/* these two bits (31&27) should be set in reg address 0xd4282800 */
 		/* otherwise, no ir. ??  needed to check with DE */
 		apmu_temp |= 0x88000000;
@@ -568,7 +773,7 @@ uint32_t pxa168_dfc_prepare(struct pxa168_dvfm_info *driver_data)
 			0xd4282800, apmu_temp);
 
 	/* make sure the allow sw mc control bit is not set */
-	writel(0x00000302, info->pmua_base + APMU_IDLE_CFG_OFF );
+	writel(0x00000302, info->pmua_base + APMU_IDLE_CFG_OFF);
 
 	return apmu_ccr;
 }
@@ -649,6 +854,7 @@ void pxa168_set_opmode_md(struct pxa168_dvfm_info *driver_data,
 				(opmode_md->pclk_div<<0);
 	writel(apmu_ccr, info->pmua_base + APMU_CCR_OFF);
 	pr_debug(">>>>>%s: apmu_ccr = %x\n", __func__,  apmu_ccr);
+
 	return;
 
 }
@@ -722,6 +928,8 @@ static int set_freq(void *driver_data, struct op_info *old, struct op_info *new)
 	/* set up the core voltage */
 	if (dvfm_old->vcc_core < dvfm_new->vcc_core)
 		update_voltage(dvfm_new->vcc_core);
+
+	dvfm_op_set = 1;
 
 	return 0;
 }
@@ -1008,6 +1216,8 @@ static struct dvfm_driver pxa168_driver = {
 	.count		= get_op_num,
 	.set		= pxa168_set_op,
 	.dump		= dump_op,
+	.modify		= modify_op,
+	.modify_help	= modify_op_help,
 	.name		= get_op_name,
 	.request_set	= pxa168_request_op,
 	.enable_dvfm	= pxa168_enable_dvfm,

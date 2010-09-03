@@ -132,7 +132,66 @@ static ssize_t ops_show(struct sys_device *sys_dev,
 
 	return len;
 }
-SYSDEV_ATTR(ops, 0444, ops_show, NULL);
+
+
+/* modify a specific operating point. */
+static ssize_t ops_store(struct sys_device *sys_dev,
+				struct sysdev_attribute *attr,
+				const char *buf, size_t len)
+{
+	struct op_info *ent = NULL;
+	const char *p = NULL;
+
+	int op_idx = 0;	/* op to be modified, from input parm */
+	int cp = 0;	/* characters parsed */
+	int rc;
+	int found = 0;
+
+	if (!dvfm_driver->modify)
+		return 0;
+
+	if (!strncmp(buf, "help", 4)) {
+		if (dvfm_driver->modify_help)
+			dvfm_driver->modify_help(dvfm_driver->priv);
+		else
+			printk(KERN_ERR "no help available.\n");
+		return -1;
+	}
+
+	rc = sscanf(buf, "%u%n", &op_idx, &cp);		/* get op to change */
+	if (rc != 1) {
+		printk(KERN_ERR "\ninvalid syntax.\n");
+		if (dvfm_driver->modify_help)
+			dvfm_driver->modify_help(dvfm_driver->priv);
+		else
+			printk(KERN_ERR "no help available.\n");
+
+		return -1;
+	}
+
+	p = buf+cp;					/* fields to change */
+
+	read_lock(&dvfm_op_list->lock);
+	if (!list_empty(&dvfm_op_list->list)) {
+		list_for_each_entry(ent, &dvfm_op_list->list, list) {
+			if (ent->index != op_idx)
+				continue;
+			dvfm_driver->modify(dvfm_driver->priv, ent, (char *)p);
+			found = 1;
+		}
+	}
+	read_unlock(&dvfm_op_list->lock);
+
+	if (!found) {
+		printk(KERN_ERR "\nopmode index not recognized in %s.", buf);
+		if (dvfm_driver->modify_help)
+			dvfm_driver->modify_help(dvfm_driver->priv);
+		return -1;
+	}
+
+	return len;
+}
+SYSDEV_ATTR(ops, 0644, ops_show, ops_store);
 
 /* Dump all enabled operating point */
 static ssize_t enable_op_show(struct sys_device *sys_dev,
