@@ -618,8 +618,8 @@ static int scan_fbbt_part(struct mtd_info *mtd, int block, void *buf, int flag)
 	size_t retlen;
 
 	max_reloc_entry = (mtd->writesize - 40) / sizeof(struct reloc_item);
-	for (page = 1; page < 5; page ++) {
-		if (found == (FOUND_PART | FOUND_FBBT))
+	for (page = 0; page < 5; page++) {
+		if (found)
 			break;
 
 		offset = ((uint64_t)block << mtd->erasesize_shift)
@@ -644,6 +644,7 @@ static int scan_fbbt_part(struct mtd_info *mtd, int block, void *buf, int flag)
 				return 1;
 
 			found |= FOUND_PART;
+			new_bbm->flags |= FOUND_PART;
 			memcpy(new_bbm->part, buf, retlen);
 			part = new_bbm->part;
 			part_num = part->part_num;
@@ -666,7 +667,7 @@ static int scan_fbbt_part(struct mtd_info *mtd, int block, void *buf, int flag)
 		}
 	}
 
-	return found == (FOUND_PART | FOUND_FBBT);
+	return found;
 }
 
 static int new_bbm_scan(struct mtd_info *mtd)
@@ -681,6 +682,7 @@ static int new_bbm_scan(struct mtd_info *mtd)
 	if (!buf)
 		return -ENOMEM;
 	flag = 0;
+	new_bbm->flags = 0;
 	for (block = 0; block < 10; block ++) {
 		ret = scan_fbbt_part(mtd, block, buf, flag);
 		if (ret) {
@@ -705,7 +707,8 @@ static int new_bbm_scan(struct mtd_info *mtd)
 	new_bbm->update_indicator = 0;
 	printk(KERN_INFO "Factory marked bad blocks:\n");
 	dump_fact_bads(new_bbm->fbbt);
-	dump_part_info(mtd);
+	if (new_bbm->flags & FOUND_PART)
+		dump_part_info(mtd);
 	return 0;
 }
 
@@ -1262,7 +1265,8 @@ static int do_check_part(struct mtd_info *mtd, struct mtd_partition *part_orig,
 	uint64_t boundary_offset, orig_size;
 	int reloc_boundary, i, j, err, last_add, last_add_orig;
 
-	if (bbm->bbm_type == BBM_LEGACY) {
+	new_bbm = (struct pxa3xx_new_bbm *)bbm->data_buf;
+	if ((bbm->bbm_type == BBM_LEGACY) | !(new_bbm->flags & FOUND_PART)) {
 		legacy_bbm = (struct pxa3xx_legacy_bbm *)bbm->data_buf;
 		reloc_boundary = mtd_div_by_eb(mtd->size, mtd)
 			- legacy_bbm->max_reloc_entry;
@@ -1293,7 +1297,6 @@ static int do_check_part(struct mtd_info *mtd, struct mtd_partition *part_orig,
 	 * reserved pool should be included in one of defined partition,
 	 * or would cause chech fail
 	 */
-	new_bbm = (struct pxa3xx_new_bbm *)bbm->data_buf;
 	last_add_orig = last_add = err = 0;
 	for (i = 0, j = 0; i < new_bbm->part->part_num && j < *num && !err; i ++) {
 		partinfo = &new_bbm->partinfo[i];

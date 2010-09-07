@@ -97,6 +97,7 @@ struct pxa3xx_new_bbm {
 	int			main_block;
 	int			back_block;
 	int			update_indicator;
+	int			flags;
 
 	struct pxa3xx_part	*part;
 	struct pxa3xx_bbt	*fbbt;
