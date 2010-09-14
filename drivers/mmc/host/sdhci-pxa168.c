@@ -713,6 +713,8 @@ void pxa_sdh_startclk(struct mmc_host *mmc)
 	/* configure CMD pin as GPIO */
 	mfp_config(pfn_lookup(cfg, PFN_GPIO, PIN_MMC_CMD), 1);
 
+	disable_irq(host->irq);
+
 	/* Send CMD0 and wait */
 	status_en_save = sdhci_readl(host, SDHCI_INT_ENABLE);
 	interrupt_en_save = sdhci_readl(host, SDHCI_SIGNAL_ENABLE);
@@ -732,6 +734,8 @@ void pxa_sdh_startclk(struct mmc_host *mmc)
 
 	sdhci_writel(host, status_en_save, SDHCI_INT_ENABLE);
 	sdhci_writel(host, interrupt_en_save, SDHCI_SIGNAL_ENABLE);
+
+	enable_irq(host->irq);
 }
 EXPORT_SYMBOL_GPL(pxa_sdh_startclk);
 
