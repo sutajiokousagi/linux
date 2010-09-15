@@ -14,6 +14,7 @@
 #include <linux/platform_device.h>
 #include <linux/mm.h>
 #include <linux/proc_fs.h>
+#include <linux/version.h>
 #include <asm/page.h>
 #include <asm/setup.h>
 
@@ -127,7 +128,11 @@ void android_add_pmem(char *name, size_t size, int no_allocator, int cached)
 	addr = (unsigned long)page_address(page);
 	paddr = virt_to_phys((void *)addr);
 	tmp = size;
+	#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34)
+	dma_map_single(NULL, (void *)addr, size, DMA_FROM_DEVICE);
+	#else
 	dma_cache_maint((void *)addr, size, DMA_FROM_DEVICE);
+	#endif
 	while(tmp > 0) {
 		SetPageReserved(virt_to_page(addr));
 		addr += PAGE_SIZE;
