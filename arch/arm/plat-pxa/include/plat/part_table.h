@@ -642,11 +642,11 @@ static struct mtd_partition partitions[] = { \
 		[4] = { \
 			.name        = "Userdata", \
 			.offset      = 0x8800000, \
-			.size        = 0x13800000,     /* massstorage*/ \
+			.size        = 0x22c00000,     /* massstorage*/ \
 		}, \
 		[5] = { \
 			.name        = "MassStorage1", \
-			.offset      = 0x1c000000, \
+			.offset      = 0x2B400000, \
 			.size        = MTDPART_SIZ_FULL, /*use rest of flash*/ \
 		}, \
 	}
