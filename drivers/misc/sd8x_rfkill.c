@@ -115,6 +115,7 @@ static int sd8x_power_on(struct sd8x_rfkill_platform_data *pdata, int on)
 		int wait = 100;
 		mmc_detect_change(pdata->mmc, msecs_to_jiffies(10));
 
+#ifdef CONFIG_RFKILL_WAIT
 		while (--wait) {
 			if ((on && pdata->mmc->card) ||
 				(!on && !pdata->mmc->card))
@@ -123,6 +124,7 @@ static int sd8x_power_on(struct sd8x_rfkill_platform_data *pdata, int on)
 		}
 		if (!wait)
 			printk(KERN_INFO "rfkill fails to wait right bus re-scan result in 10 seconds\n");
+#endif
 	}
 
 	gpio_free(gpio_power_down);
