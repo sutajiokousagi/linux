@@ -55,7 +55,7 @@
 #endif
 
 #define DRIVER_NAME 	"pxa168-mfu"
-#define DRIVER_VERSION 	"0.1"
+#define DRIVER_VERSION 	"0.2"
 
 /*
  * Registers
@@ -168,8 +168,8 @@
 
 #define NUM_RX_DESCS		64
 #define NUM_TX_DESCS		64
-#define MAX_DESCS_PER_HIGH	(60)
-#define TX_DESC_COUNT_LOW	(10)
+#define TX_DESC_COUNT_LOW	(NUM_TX_DESCS - 60)
+#define TX_DESC_COUNT_HIGH	(NUM_TX_DESCS - 4)
 
 #define HASH_ADD		0
 #define HASH_DELETE		1
@@ -475,7 +475,7 @@ static void rxq_refill(struct net_device *dev)
 {
 	struct pxa168_private *mp = netdev_priv(dev);
 	struct sk_buff *skb;
-	volatile struct rx_desc *p_used_rx_desc;
+	struct rx_desc *p_used_rx_desc;
 	int used_rx_desc;	/* Where to return Rx resource */
 	unsigned long flags;
 
@@ -903,7 +903,7 @@ static void eth_port_reset(struct net_device *dev)
 int txq_reclaim(struct net_device *dev, int force)
 {
 	struct pxa168_private *mp = netdev_priv(dev);
-	volatile struct tx_desc *desc;
+	struct tx_desc *p_tx_desc;
 	u32 cmd_sts;
 	struct sk_buff *skb;
 	unsigned long flags;
@@ -922,8 +922,8 @@ int txq_reclaim(struct net_device *dev, int force)
 		}
 
 		tx_index = mp->tx_used_desc_q;
-		desc = &mp->p_tx_desc_area[tx_index];
-		cmd_sts = desc->cmd_sts;
+		p_tx_desc = &mp->p_tx_desc_area[tx_index];
+		cmd_sts = p_tx_desc->cmd_sts;
 
 		if (!force && (cmd_sts & BUF_OWNED_BY_DMA)) {
 			spin_unlock_irqrestore(&mp->lock, flags);
@@ -936,8 +936,8 @@ int txq_reclaim(struct net_device *dev, int force)
 		mp->tx_used_desc_q = (tx_index + 1) % mp->tx_ring_size;
 		mp->tx_desc_count--;
 
-		addr = desc->buf_ptr;
-		count = desc->byte_cnt;
+		addr = p_tx_desc->buf_ptr;
+		count = p_tx_desc->byte_cnt;
 		skb = mp->tx_skb[tx_index];
 		if (skb)
 			mp->tx_skb[tx_index] = NULL;
@@ -1140,15 +1140,14 @@ static irqreturn_t pxa168_eth_int_handler(int irq, void *dev_id)
 		}
 	}
 #else
-	if (icr & (ICR_RXBUF | ICR_RXERR)) {
+	if (icr & (ICR_RXBUF | ICR_RXERR))
 		rxq_process(dev, mp->rx_ring_size);
 
+	txq_reclaim(dev, 0);
+	if (netif_queue_stopped(dev)
+	&& mp->tx_desc_count <= TX_DESC_COUNT_LOW)
+		netif_wake_queue(dev);
 
-	if (icr & (ICR_TXBUF_H | ICR_TXBUF_L | ICR_TX_UDR)) {
-		if (txq_reclaim(dev, 0)
-		&& mp->tx_ring_size - mp->tx_desc_count >= TX_DESC_COUNT_LOW)
-			netif_wake_queue(dev);
-	}
 #endif
 
 	return IRQ_HANDLED;
@@ -1433,7 +1432,6 @@ static int pxa168_eth_open(struct net_device *dev)
 	netif_wake_queue(dev);
 #endif
 
-
 #ifdef MFU_TIMER
 	mp->mfu_timer->expires = jiffies + (HZ / 10);	/* 100 mSec */
 	add_timer(mp->mfu_timer);
@@ -1565,7 +1563,13 @@ static void eth_tx_submit_descs_for_skb(struct pxa168_private *mp,
 
 	/* ensure all other descriptors are written before first cmd_sts */
 	wmb();
-	desc->cmd_sts = BUF_OWNED_BY_DMA | TX_GEN_CRC | TX_FIRST_DESC |
+
+	if (mp->tx_desc_count >= TX_DESC_COUNT_HIGH)
+		desc->cmd_sts = BUF_OWNED_BY_DMA | TX_GEN_CRC | TX_FIRST_DESC |
+				TX_ZERO_PADDING | TX_LAST_DESC |
+				TX_EN_INT;
+	else
+		desc->cmd_sts = BUF_OWNED_BY_DMA | TX_GEN_CRC | TX_FIRST_DESC |
 						TX_ZERO_PADDING | TX_LAST_DESC;
 	wmb();
 
@@ -1576,7 +1580,7 @@ static void eth_tx_submit_descs_for_skb(struct pxa168_private *mp,
 }
 
 #ifdef NAPI_PMR
-static int pxa168_rx_poll(struct napi_struct *napi, int budget)
+static int pxa168_napi_poll(struct napi_struct *napi, int budget)
 {
 	struct pxa168_private *mp =
 		container_of(napi, struct pxa168_private, napi);
@@ -1585,12 +1589,10 @@ static int pxa168_rx_poll(struct napi_struct *napi, int budget)
 
 	txq_reclaim(dev, 0);
 	if (netif_queue_stopped(dev)
-	&& mp->tx_ring_size - mp->tx_desc_count >= TX_DESC_COUNT_LOW)
+	&& mp->tx_desc_count <= TX_DESC_COUNT_LOW)
 		netif_wake_queue(dev);
 
 	rxPacketsProcessed = rxq_process(dev, budget);
-	if (mp->tx_ring_size - mp->tx_desc_count >= TX_DESC_COUNT_LOW)
-		netif_wake_queue(dev);
 
 	if (rxPacketsProcessed <= budget) {
 		/* Enable interrupts */
@@ -1634,35 +1636,13 @@ static int pxa168_eth_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	BUG_ON(skb == NULL);
 
 #ifndef RESTART_DMA_WORKAROUND
-	/* not used if RESTART_DMA_WORKAROUND SINCE TX QUEUE */
-	/* NEVER HAS MORE THEN ONE XFER */
 	txq_reclaim(dev, 0);
-	if (mp->tx_ring_size - mp->tx_desc_count < MAX_DESCS_PER_HIGH) {
-		int curr_desc_no;
+#endif
 
-		/* only tx interrupt if we are about to stop the queue */
-		/* set tx interrupt enabled */
-		spin_lock_irqsave(&mp->lock, flags);
-		curr_desc_no = (mp->tx_curr_desc_q + mp->tx_ring_size - 1)
-			% mp->tx_ring_size;
-		desc = &mp->p_tx_desc_area[curr_desc_no];
-		desc->cmd_sts |= TX_EN_INT;
-		wmb();
-		spin_unlock_irqrestore(&mp->lock, flags);
-
-		/* if buf NOT owned by dma -- do not stop the queue */
-		/* we will not see the interrupt */
-		if (desc->cmd_sts & BUF_OWNED_BY_DMA)
-			netif_stop_queue(dev);
-
-		return NETDEV_TX_BUSY;
-	}
-#else
-	if (mp->tx_ring_size - mp->tx_desc_count < MAX_DESCS_PER_HIGH) {
+	if (mp->tx_desc_count > TX_DESC_COUNT_HIGH) {
 		netif_stop_queue(dev);
 		return NETDEV_TX_BUSY;
 	}
-#endif
 
 	if (skb_shinfo(skb)->nr_frags && __skb_linearize(skb)) {
 		spin_lock_irqsave(&mp->lock, flags);
@@ -1674,31 +1654,10 @@ static int pxa168_eth_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	spin_lock_irqsave(&mp->lock, flags);
-
-	eth_tx_submit_descs_for_skb(mp, skb);
-	stats->tx_bytes += skb->len;
-	stats->tx_packets++;
-	dev->trans_start = jiffies;
-
-#ifndef RESTART_DMA_WORKAROUND
-	if (mp->tx_ring_size - mp->tx_desc_count < MAX_DESCS_PER_HIGH) {
-		int curr_desc_no;
-		struct tx_desc *desc;
-
-		curr_desc_no = (mp->tx_curr_desc_q + mp->tx_ring_size - 1)
-				% mp->tx_ring_size;
-		/* only tx interrupt if we are about to stop the queue */
-		/* set tx interrupt enabled */
-		desc = &mp->p_tx_desc_area[curr_desc_no];
-		desc->cmd_sts |= TX_EN_INT;
-		wmb();
-
-		/* if buf NOT owned by dma do not stop the queue */
-		/* we will not see the interrupt */
-		if (desc->cmd_sts & BUF_OWNED_BY_DMA)
-			netif_stop_queue(dev);
-	}
-#endif
+		eth_tx_submit_descs_for_skb(mp, skb);
+		stats->tx_bytes += skb->len;
+		stats->tx_packets++;
+		dev->trans_start = jiffies;
 	spin_unlock_irqrestore(&mp->lock, flags);
 
 #ifdef RESTART_DMA_WORKAROUND
@@ -1736,9 +1695,6 @@ static int pxa168_eth_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		abortDMA(mp);
 	}
 #endif
-
-	if (mp->tx_ring_size - mp->tx_desc_count >= TX_DESC_COUNT_LOW)
-		netif_wake_queue(dev);
 
 	return NETDEV_TX_OK;		/* success */
 }
@@ -1927,7 +1883,7 @@ static int pxa168_eth_probe(struct platform_device *pdev)
 	/* enable MFU clock  */
 	clk = clk_get(&pdev->dev, "MFUCLK");
 	if (IS_ERR(clk)) {
-		printk(KERN_ERR "fast Ethernet failed to get camera clock\n");
+		printk(KERN_ERR "pxa168: fast Ethernet failed to get MFU clock\n");
 		return -1;
 	}
 	clk_enable(clk);
@@ -2001,7 +1957,7 @@ static int pxa168_eth_probe(struct platform_device *pdev)
 	}
 
 #ifdef NAPI_PMR
-	netif_napi_add(dev, &mp->napi, pxa168_rx_poll, mp->rx_ring_size);
+	netif_napi_add(dev, &mp->napi, pxa168_napi_poll, mp->rx_ring_size);
 #endif
 
 	/* Hook up MII support for ethtool */
