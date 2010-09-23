@@ -270,17 +270,10 @@ void pxa168_mfp_set_fastio_drive(int type)
 
 #define MFP_VDD_IO_SET(type, pin, bit)			\
         do {                                            \
-		if (cpu_is_pxa168_S0()) {               \
-			if (type == VDD_IO_3P3V)	\
-				mfp_clr(pin, 1<<(bit));	\
-			else				\
-                                mfp_set(pin, 1<<(bit)); \
-                } else {                                \
-			if (type == VDD_IO_3P3V)	\
-				mfp_set(pin, 1<<(bit));	\
-			else				\
-				mfp_clr(pin, 1<<(bit));	\
-		}					\
+		if (type == VDD_IO_3P3V)	\
+			mfp_set(pin, 1<<(bit));	\
+		else				\
+			mfp_clr(pin, 1<<(bit));	\
 	} while (0);
 
 void pxa168_set_vdd_iox(vdd_io_t vdd_io, int type)

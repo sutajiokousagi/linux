@@ -589,10 +589,7 @@ static int pxa168_pm_enter_sleep(struct pxa168_pm_regs *pm_regs)
 	__raw_writel(virt_to_phys(&(pm_regs->pm_data)), pm_regs->data_pool + 4);
 
 	/* Write Hibernate mode indicator to SDRAM */
-	if(cpu_is_pxa168_S0())
-		__raw_writel(0xa, pm_regs->data_pool + 8);
-	else
-		__raw_writel(0x55AA55AA, pm_regs->data_pool + 8);
+	__raw_writel(0x55AA55AA, pm_regs->data_pool + 8);
 
 	pxa168_cpu_sleep((unsigned int)&(pm_regs->pm_data),
 			virt_to_phys(&(pm_regs->pm_data)));

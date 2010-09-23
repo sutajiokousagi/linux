@@ -82,15 +82,6 @@ static inline int cpu_is_pxa910_Ax(void)
 		return 0;
 }
 
-static inline int cpu_is_pxa168_S0(void)
-{
-	unsigned int chip_id = __raw_readl(CHIP_ID);
-	if (cpu_is_pxa168() && ((chip_id & 0x0000ffff) == 0x0000c910))
-		return 1;
-	else
-		return 0;
-}
-
 static inline int cpu_is_pxa168_A0(void)
 {
 	unsigned int chip_id = __raw_readl(CHIP_ID);
