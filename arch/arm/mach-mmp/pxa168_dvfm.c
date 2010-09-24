@@ -379,118 +379,73 @@ static int dump_op_list(void *driver_data, struct info_head *op_table)
 void pxa168_op_machine_to_human(struct pxa168_opmode_md  *opmode_md,
 					struct pxa168_md_opt *opmode_hu)
 {
-	unsigned int corepll, axipll;
-	int nume_temp, deno_temp;
-	int post_div;
-	int post_div_ration_nume = 1;
-	int post_div_ration_deno = 1;
-	opmode_hu->power_mode = opmode_md->power_mode;
-	strncpy(opmode_hu->name, opmode_md->name, OP_NAME_LEN);
-	if (opmode_md->power_mode == POWER_MODE_ACTIVE) {
-		if (opmode_md->corepll_sel == 0) {
-			corepll = 312;
-		} else if (opmode_md->corepll_sel == 1) {
-			corepll = 624;
-		} else {
-			nume_temp = opmode_md->pll2_fbdiv;
-			deno_temp = opmode_md->pll2_refdiv;
-			switch (deno_temp) {
-			case 0x00:
-				deno_temp = 1;
-				break;
-			case 0x10:
-				deno_temp = 2;
-				break;
-			case 0x01:
-				deno_temp = 3;
-				break;
-			default:
-				deno_temp += 2;
-				break;
-			}
-			corepll = 26*nume_temp/deno_temp;
-		}
+	unsigned int    vco_freq, vco_div_se, vco_div_diff;
+	unsigned int    corepll_se, corepll_diff, pclk;
+	unsigned int    axipll_se;
 
-		if (opmode_md->axipll_sel == 0) {
-			axipll = 312;
-		} else if (opmode_md->axipll_sel == 1) {
-			axipll = 624;
-		} else {
-			nume_temp = opmode_md->pll2_fbdiv;
-			deno_temp = opmode_md->pll2_refdiv;
-			switch (deno_temp) {
-			case 0x00:
-				deno_temp = 1;
-				break;
-			case 0x10:
-				deno_temp = 2;
-				break;
-			case 0x01:
-				deno_temp = 3;
-				break;
-			default:
-				deno_temp += 2;
-				break;
-			}
-			axipll = 26*nume_temp/deno_temp;
-		}
+	/* determine the corepll frequency */
+	/* the same pll will feed ddr, bus (baclk) and l2 (xpclk)   */
+	/* note: better to get the freq & div info from fccr & reg1 */
+	/* but the opmode structs would need those fields added 1st.*/
+	switch (opmode_md->corepll_sel) {
+	case 0:
+	vco_freq = 312;
+	vco_div_se = 0;
+	vco_div_diff = 0;
+	break;
 
-		if (opmode_md->corepll_sel == 2) {
+	case 1:
+	vco_freq = 624;
+	vco_div_se = 0;
+	vco_div_diff = 0;
+	break;
 
-			post_div = (opmode_md->pll2_reg1 &
-				MPMU_PLL2_REG1_VCODIV_SEL_DIFF_MSK)>>
-				MPMU_PLL2_REG1_VCODIV_SEL_DIFF_BASE;
-
-			switch (post_div) {
-			case 0x0:
-				post_div_ration_nume = 1;
-				break;
-			case 0x1:
-				post_div_ration_nume = 3;
-				post_div_ration_deno = 2;
-				break;
-			case 0x2:
-				post_div_ration_nume = 2;
-				break;
-			case 0x3:
-				post_div_ration_nume = 5;
-				post_div_ration_deno = 2;
-				break;
-			case 0x4:
-				post_div_ration_nume = 3;
-				break;
-			case 0x5:
-				post_div_ration_nume = 4;
-				break;
-			case 0x6:
-				post_div_ration_nume = 8;
-				break;
-			case 0x7:
-				post_div_ration_nume = 6;
-				break;
-			case 0x9:
-				post_div_ration_nume = 10;
-				break;
-			case 0xa:
-				post_div_ration_nume = 12;
-				break;
-			case 0xb:
-				post_div_ration_nume = 14;
-				break;
-			}
-		}
-
-		opmode_hu->pclk = corepll/(opmode_md->pclk_div + 1);
-		opmode_hu->baclk = corepll/(opmode_md->baclk_div + 1);
-		opmode_hu->xpclk = corepll/(opmode_md->xpclk_div + 1);
-		opmode_hu->dclk = (corepll*post_div_ration_deno)/
-			(2*(opmode_md->dclk_div + 1)*post_div_ration_nume);
-		opmode_hu->aclk = axipll/(opmode_md->aclk_div + 1);
-		opmode_hu->aclk2 = axipll/(opmode_md->aclk2_div + 1);
-		opmode_hu->vcc_core = opmode_md->vcc_core;
-		opmode_hu->lpj = opmode_hu->pclk * 5000;
+	default:
+	vco_freq = 26 * opmode_md->pll2_fbdiv / (opmode_md->pll2_refdiv+2);
+	vco_div_se = ((opmode_md->pll2_reg1>>23)&0x0f);
+	vco_div_diff = ((opmode_md->pll2_reg1>>19)&0x0f);
+	break;
 	}
-	return;
+
+	corepll_se = (2 * vco_freq) / (vco_div_se + 2); /* +2 gives # halves*/
+	corepll_diff = (2 * vco_freq) / (vco_div_diff + 2);  /* dclk */
+	pclk = corepll_se/(opmode_md->pclk_div+1);
+
+	/* deterine the axipll frequency */
+	if (opmode_md->axipll_sel == opmode_md->corepll_sel)
+		axipll_se = corepll_se;
+	else
+		switch (opmode_md->axipll_sel) {
+		case 0:
+		vco_freq = 312;
+		vco_div_se = 0;
+		vco_div_diff = 0;
+		break;
+
+		case 1:
+		vco_freq = 624;
+		vco_div_se = 0;
+		vco_div_diff = 0;
+		break;
+
+		default:
+		vco_freq = 26*opmode_md->pll2_fbdiv/(opmode_md->pll2_refdiv+2);
+		vco_div_se = ((opmode_md->pll2_reg1>>23)&0x0f);
+		vco_div_diff = ((opmode_md->pll2_reg1>>19)&0x0f);
+		break;
+		}
+
+	axipll_se = (2 * vco_freq) / (vco_div_se + 2);
+
+	opmode_hu->pclk  = pclk;
+	opmode_hu->baclk = pclk/(opmode_md->baclk_div+1);
+	opmode_hu->xpclk = pclk/(opmode_md->xpclk_div+1);
+	opmode_hu->dclk  = corepll_diff/(opmode_md->dclk_div+1)/2;
+	opmode_hu->aclk  = axipll_se/(opmode_md->aclk_div+1);
+	opmode_hu->aclk2 = axipll_se/(opmode_md->aclk2_div + 1);
+	opmode_hu->vcc_core = opmode_md->vcc_core;
+	opmode_hu->lpj   = opmode_hu->pclk * 5000;
+
 }
 
 static const char *modify_op_help_text =
