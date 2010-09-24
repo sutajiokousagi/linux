@@ -330,58 +330,29 @@ static int dump_op(void *driver_data, struct op_info *p, char *buf)
 	if (q == NULL)
 		len = sprintf(buf, "Can't dump the op info\n");
 	else {
-		if (dvfm_op_set) {
-			/* calculate how much bits is set in device word */
-			max = DVFM_MAX_CLIENT >> 5;
-			for (i = 0, sum = 0; i < max; i++) {
-				x = p->device[i];
-				for (count = 0; x; x = x & (x - 1), count++)
-					;
-				sum += count;
-			}
-			len = sprintf(buf, "OP:%d name:%s [%s, %d]\n",
-					p->index, q->name, (sum) ? "Disabled"
-					: "Enabled", sum);
-		} else {
-			len = sprintf(buf,
-					  "Op not set. "
-					  "Use 'echo # > op' first.\n"
-					  "Example: To select mode 0 enter:\n"
-					  "  echo 0 > op\n"
-					  "Current register settings are:\n"
-					);
-		}
+		md = q->dvfm_settings;
 
-		if (q->power_mode == POWER_MODE_ACTIVE) {
-			len += sprintf(buf + len, "pclk:%d baclk:%d xpclk:%d "
-				"dclk:%d aclk:%d aclk2:%d vcc_core:%d\n",
-				q->pclk, q->baclk, q->xpclk,
-				q->dclk, q->aclk, q->aclk2, q->vcc_core);
-			md = q->dvfm_settings;
-			len += sprintf(buf + len,
-				"cp:%d ap:%d a1d:%d a2d:%d dcd:%d "
-				"xpd:%d bad:%d pcd:%d 2r:%d 2f:%d 21:%08x\n",
-				md->corepll_sel, md->axipll_sel,
-				md->aclk_div, md->aclk2_div,
-				md->dclk_div,
-				md->xpclk_div,
-				md->baclk_div,
-				md->pclk_div,
-				md->pll2_refdiv,
-				md->pll2_fbdiv,
-				md->pll2_reg1);
+		/* calculate how much bits is set in device word */
+		max = DVFM_MAX_CLIENT >> 5;
+		for (i = 0, sum = 0; i < max; i++) {
+			x = p->device[i];
+			for (count = 0; x; x = x & (x - 1), count++)
+				;
+			sum += count;
+		}
+		len = sprintf(buf, "OP:%d name: %s [%s, %d]\n",
+				p->index, md->name,
+				(sum) ? "Disabled" : "Enabled", sum
+				);
+
+		if (md->power_mode == POWER_MODE_ACTIVE) {
+			len += sprintf(buf + len, "pclk:%d dclk:%d xpclk:%d "
+				"baclk:%d aclk:%d aclk2:%d vcc_core:%d\n",
+				q->pclk, q->dclk, q->xpclk,
+				q->baclk, q->aclk, q->aclk2, q->vcc_core);
 
 		}
 	}
-
-	/* pxa168_get_current_opmode_md(info, &opmode_md_temp);
-	pxa168_op_machine_to_human(&opmode_md_temp, &md_opt_temp);
-	len += sprintf(buf + len, "pclk:%d baclk:%d xpclk:%d "
-				"dclk:%d aclk:%d aclk2:%d vcc_core:%d\n",
-				md_opt_temp.pclk, md_opt_temp.baclk,
-				md_opt_temp.xpclk, md_opt_temp.dclk,
-				md_opt_temp.aclk, md_opt_temp.aclk2,
-				md_opt_temp.vcc_core);*/
 
 	return len;
 }
