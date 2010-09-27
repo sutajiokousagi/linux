@@ -97,8 +97,10 @@ static int mspm_request_tune(int mips)
 			op_mips[i].mips / 100))
 			break;
 	}
-	dvfm_request_op(0);
-	dvfm_request_op(i);
+	if (i != cur_op) {
+		dvfm_request_op(0);
+		dvfm_request_op(i);
+	}
 	return 0;
 }
 

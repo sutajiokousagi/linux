@@ -42,6 +42,7 @@
 #include <mach/irqs.h>
 #include <mach/dvfm.h>
 #include <mach/mspm_prof.h>
+#include <mach/pxa168_dvfm.h>
 #include <linux/slab.h>
 
 /*
@@ -1112,6 +1113,7 @@ void pxa168_pm_enter_apps_sleep_test(void)
 void pxa168_pm_enter_sys_sleep_test(void)
 {
 	uint32_t icu_ap_gbl_irq_msk;
+	unsigned long flags;
 
 	/* step 1: set the wakeup source */
 	/*********************************************************************
@@ -1120,13 +1122,13 @@ void pxa168_pm_enter_sys_sleep_test(void)
 	 * 		AP1_TIMER1(8), WAKEUP4,3(4,3)
 	 * note:	must mask WAKEUP5(5) and WAKEUP1(1)(for USB port)
 	 *********************************************************************/
-	__raw_writel(0x220018, MPMU_AWUCRM);
+	__raw_writel(0x00200008, MPMU_AWUCRM);	/* key, wk3 */
 
 	/* step 2: set the IDLE bit in the AP idle configuration register*/
 	/*********************************************************************
 	 * set:	DIS_MC_SW_REQ(21), MC_WAKE_EN(20), L2_RESETn(9), and IDLE(1)
 	 * *******************************************************************/
-	__raw_writel(0x300202, APMU_IDLE_CFG);
+	__raw_writel(0x00300302, APMU_IDLE_CFG); /* auto_mc_wk, cor_clk_off */
 
 	/* step 3: set the global interrupt mask in the ICU register to mask
 	 * the SYNC IRQ to the core */
@@ -1147,9 +1149,14 @@ void pxa168_pm_enter_sys_sleep_test(void)
 	 *	SetAlways(25), SLPWP0,1,2,5,6,7(23,22,21,17,16,15),
 	 *	SetAlways(14)
 	 *********************************************************************/
-	__raw_writel(0xbee3c000, MPMU_APCR);
+	local_fiq_disable();
+	local_irq_save(flags);
 
-	pxa168_pm_swi();
+	pxa168_trigger_lpm(0xbee3c000); /*mpmu_apcr: splen,sd(axi,ddr,cor,apb)*/
+
+	local_irq_restore(flags);
+	local_fiq_enable();
+
 }
 
 

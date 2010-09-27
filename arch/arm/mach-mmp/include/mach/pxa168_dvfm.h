@@ -204,6 +204,10 @@ extern int pxa168_trigger_dfc(uint32_t apmu_ccr);
 extern unsigned long  pxa168_dfc_get_lockcache_location(unsigned long *base, \
 		unsigned int *size);
 
+extern int pxa168_trigger_lpm(uint32_t mpmu_apcr);
+extern unsigned long  pxa168_lpm_get_lockcache_location(unsigned long *base, \
+		unsigned int *size);
+
 extern void pxa168_get_current_opmode_md(struct pxa168_dvfm_info *driver_data,\
 		struct pxa168_opmode_md *opmode_md);
 

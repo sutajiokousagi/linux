@@ -48,6 +48,8 @@
 unsigned long dfc_lock_cache_code_base;
 EXPORT_SYMBOL(dfc_lock_cache_code_base);
 
+unsigned long lpm_lock_cache_code_base;
+EXPORT_SYMBOL(lpm_lock_cache_code_base);
 
 static struct info_head pxa168_dvfm_op_list = {
 	.list = LIST_HEAD_INIT(pxa168_dvfm_op_list.list),
@@ -1566,6 +1568,9 @@ static int __init pxa168_freq_init(void)
 #endif
 	pxa168_dfc_get_lockcache_location(&base, &size);
 	dfc_lock_cache_code_base = remap_to_uncacheable(base, size);
+
+	pxa168_lpm_get_lockcache_location(&base, &size);
+	lpm_lock_cache_code_base = remap_to_uncacheable(base, size);
 
 	return platform_driver_register(&pxa168_freq_driver);
 }
