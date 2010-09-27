@@ -320,6 +320,8 @@ config AUDIT_TREE
 	depends on AUDITSYSCALL
 	select INOTIFY
 
+source "kernel/irq/Kconfig"
+
 menu "RCU Subsystem"
 
 choice
