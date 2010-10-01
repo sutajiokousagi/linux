@@ -54,6 +54,7 @@
 #include <linux/namei.h>
 #include <linux/dma-mapping.h>
 #include <linux/slab.h>
+#include <linux/version.h>
 
 static int read_block(struct inode *inode, void *addr, unsigned int block,
 		      struct ubifs_data_node *dn)
@@ -178,6 +179,13 @@ out:
 	SetPageUptodate(page);
 	ClearPageError(page);
 	flush_dcache_page(page);
+#ifdef CONFIG_CPU_L2_CACHE
+	#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34)
+	dma_map_single(NULL, (void *)addr, PAGE_CACHE_SIZE, DMA_TO_DEVICE);
+	#else
+	dma_cache_maint(addr, PAGE_CACHE_SIZE, DMA_TO_DEVICE);
+	#endif
+#endif
 	kunmap(page);
 	return 0;
 
@@ -186,6 +194,13 @@ error:
 	ClearPageUptodate(page);
 	SetPageError(page);
 	flush_dcache_page(page);
+#ifdef CONFIG_CPU_L2_CACHE
+	#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34)
+	dma_map_single(NULL, (void *)addr, PAGE_CACHE_SIZE, DMA_TO_DEVICE);
+	#else
+	dma_cache_maint(addr, PAGE_CACHE_SIZE, DMA_TO_DEVICE);
+	#endif
+#endif
 	kunmap(page);
 	return err;
 }
@@ -684,6 +699,13 @@ out_hole:
 	SetPageUptodate(page);
 	ClearPageError(page);
 	flush_dcache_page(page);
+#ifdef CONFIG_CPU_L2_CACHE
+	#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34)
+	dma_map_single(NULL, (void *)addr, PAGE_CACHE_SIZE, DMA_TO_DEVICE);
+	#else
+	dma_cache_maint(addr, PAGE_CACHE_SIZE, DMA_TO_DEVICE);
+	#endif
+#endif
 	kunmap(page);
 	*n = nn;
 	return 0;
@@ -692,6 +714,13 @@ out_err:
 	ClearPageUptodate(page);
 	SetPageError(page);
 	flush_dcache_page(page);
+#ifdef CONFIG_CPU_L2_CACHE
+	#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34)
+	dma_map_single(NULL, (void *)addr, PAGE_CACHE_SIZE, DMA_TO_DEVICE);
+	#else
+	dma_cache_maint(addr, PAGE_CACHE_SIZE, DMA_TO_DEVICE);
+	#endif
+#endif
 	kunmap(page);
 	ubifs_err("bad data node (block %u, inode %lu)",
 		  page_block, inode->i_ino);
@@ -1038,6 +1067,13 @@ static int ubifs_writepage(struct page *page, struct writeback_control *wbc)
 	kaddr = kmap_atomic(page, KM_USER0);
 	memset(kaddr + len, 0, PAGE_CACHE_SIZE - len);
 	flush_dcache_page(page);
+#ifdef CONFIG_CPU_L2_CACHE
+	#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34)
+	dma_map_single(NULL, (void *)kaddr, PAGE_CACHE_SIZE, DMA_TO_DEVICE);
+	#else
+	dma_cache_maint(kaddr, PAGE_CACHE_SIZE, DMA_TO_DEVICE);
+	#endif
+#endif
 	kunmap_atomic(kaddr, KM_USER0);
 
 	if (i_size > synced_i_size) {
