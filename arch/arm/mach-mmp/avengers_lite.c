@@ -904,7 +904,7 @@ static struct pxa2xx_spi_chip cmmb_if101_chip = {
 };
 
 /* bus_num must match id in pxa2xx_set_spi_info() call */
-#if !defined(CONFIG_MTD_M25P80)
+#if defined(CONFIG_CMMB_IF101)
 static struct spi_board_info spi_board_info[] __initdata = {
 	{
 		.modalias	= "cmmb_if101",
@@ -917,7 +917,7 @@ static struct spi_board_info spi_board_info[] __initdata = {
 		.mode		= SPI_MODE_0,
 	},
 };
-#else
+#elif defined(CONFIG_MTD_M25P80)
 static struct pxa2xx_spi_chip m25pxx_spi_info = {
 	.tx_threshold = 1,
 	.rx_threshold = 1,
@@ -941,7 +941,7 @@ static struct spi_board_info __initdata spi_board_info[] = {
 
 static void __init avengers_lite_init_spi(void)
 {
-#ifndef CONFIG_MTD_M25P80
+#if defined(CONFIG_CMMB_IF101)
 	int err;
 
 	err = gpio_request(GPIO_CMMB_CS, "cmmb if101 cs");
@@ -960,7 +960,9 @@ static void __init avengers_lite_init_spi(void)
 #endif
 	pxa168_add_ssp(1);
 	pxa168_add_spi(2, &pxa_ssp_master_info);
+#if defined(CONFIG_MTD_M25P80) || defined(CONFIG_CMMB_IF101)
 	spi_register_board_info(spi_board_info, ARRAY_SIZE(spi_board_info));
+#endif
 }
 #else
 static inline void avengers_lite_init_spi(void) {}
