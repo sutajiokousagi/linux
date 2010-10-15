@@ -333,21 +333,21 @@ lpm_ready_check:
 	str	r3, [r12, #0x01e0]	/* restore DDR address/command subphy */
 	str	r4, [r12, #0x01d0]	/* restore DDR data sub-phy */
 
-	@mov	r0, #0x00100000		/* ensure the request completes */
-	mov	r0, #0x00000100		/* ensure the request completes */
-1881:
+	mov	r0, #0x00100000		/* ensure the request completes */
+bpcC:
 	subs	r0, r0, #1
-	bne	1881b
+	bne	bpcC
 
 /* end of phy off */
 
 
 	@ Step 6
 	@ re-initialize the DDR
+
 	mov	r1, r12		@ r12 has dmc_membase
 
-
-	@ set PHY_SYNC_EN, resynchronize the PHY at the current DCLK
+	@ set PHY_SYNC_EN
+	@ resynchronize the new PHY clock
 	ldr r0, =0x80000000
 	str r0, [r1, #0x240]
 
@@ -359,9 +359,7 @@ lpm_ready_check:
 #endif
 
 
-	@start of DRAM DLL reset
-
-	@ set DLL_RESET bit of the DRAM (not the MCU)
+	@ set DLL_RESET bit
 	ldr r0, =0x40
 	str r0, [r1, #0x80]
 
@@ -369,76 +367,37 @@ lpm_ready_check:
 	ldr r0, =0x03000100
 	str r0, [r1, #0x120]
 
-	@clean DLL_RESET bit of the DRAM (not the MCU)
+	@clean DLL_RESET bit
 	ldr r0, =0x0
 	str r0, [r1, #0x80]
 
-	@end of DRAM DLL Reset
-
-
-
-	@ Master & slave DLL calibration:
-	@DPF-942: DLL configuration should be:
-	@		DLL enabled (not bypass or test mode),
-	@		DLL auto updates disabled,
-	@		leave level of UPDATE_EN high
-
-	@ 1. make sure dll_auto_manual_update_en=dll_test_en=dll_bypass_en=0
-	ldr r0, [r1, #0x230]	@ PHY_CNTRL_13, DLL byte lane 0
-	and r0, r0, #0x0FFFFFF0	@ clear dll reset timer & dll cfg fields
-	orr r0, r0, #0x80000000	@ dll reset time to 8, dll cfg as note above.
+	@set DLL_RESET_TIMER to 8
+	ldr r0, [r1, #0x230]
+	and r0, r0, #0x0FFFFFFF
+	orr r0, r0, #0x80000000
 	str r0, [r1, #0x230]
 
-	@    same for DLL byte lane 1
-	ldr r0, [r1, #0xe10]	@ PHY_DLL_CNTRL_1, DLL byte lane 1
-	ldr r2, =0x01ff01f0	@ mask to clear reserved & dll cfg fields
-	and r0, r0, r2		@ clear reserved2 fields & dll cfg fields
-	str r0, [r1, #0xe10]
-
 	@ set PHY_DLL_RESET
-	mov r0, #0x20000000
+	ldr r0, =0x20000000
 	str r0, [r1, #0x240]
 
-	@ 2. wait for the reset to complete. that will ensure the master dll
-	@    value is correct before forcing it to propagate to the slave chain.
-	@
-	@    DM says all MC accesses are blocked until the dll_reset_timer
-	@    expires. a read from the MCU will stall until the reset completes.
-	ldr r0, [r1, #0240] @ read back to ensure dll reset completes.
+	@write bit 27 of PHY_CNTRL_14 and wait at least
+	ldr r0, =0x08000000
+	str r0, [r1, #0x240]
 
 
-	@ 3. make sure the update_static_en value is 0.
-	@    that is because the slave DLL needs
-	@    to see a rising edge on UPDATE_EN.
-	@    if it is not 0, do the procedure below to force it to 0:
-	@    a. write 1 to toggle the state (now it will be 0.)
-	@    b. wait 512 clock cycles for the bit to clear.
-	@
-	tst r0, #0x08000000	@ test current value of update_en
-	beq 1883f		@ branch if update_en is 0.
-	mov r0, #0x08000000	@ ensure only update_en_static is written
-	str r0, [r1, #0x0240]	@ update_en was 1. must toggle it to 0.
-	mov r2, #512		@ count 512 accesses to the mcu
-1882:	ldr r0, [r1, #0x0240]
-	subs r2, r2, #1
-	bne 1882b
+	@512 dlck cycles at least to update DLL.
+	ldr     r0, =512
+wait_512dclks:
+	subs    r0, r0, #2
+	bne     wait_512dclks
 
-1883:
-	@ 4. set update_en_static to send dll_delay_out to slave delay chain
-	mov r0, #0x08000000	@ for update_static-en to 1.
-	str r0, [r1, #0x0240]
 
-	@ 5. wait 512 clks.
-	mov r2, #512		@ count 512 accesses to the mcu
-1884:	ldr r0, [r1, #0x0240]
-	subs r2, r2, #1
-	bne 1884b
+	@write bit 27 of PHY_CNTRL_14 again to restore,
+	@since this bit is a write '1' to toggle bit.
+	ldr r0, =0x08000000
+	str r0, [r1, #0x240]
 
-	@ 6. done. leave update_en_static set at 1.
-	@
-	@ end of new procedure mandated by dpf942
-
-	@done with ddr reset and configure.
 
 #ifdef DDR_SR_BY_APMU
 	@ Make DDR out of self-refresh
