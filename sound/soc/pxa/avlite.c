@@ -129,6 +129,10 @@ static int avlite_wm8960_init(struct snd_soc_codec *codec)
 
 	snd_soc_dapm_add_routes(codec, audio_map, ARRAY_SIZE(audio_map));
 
+	/* setting for HP autodetection avlite specific */
+	snd_soc_write(codec, WM8960_ADDCTL2 , 0x40);
+	snd_soc_write(codec, WM8960_ADDCTL4 , 0x8);
+	snd_soc_write(codec, WM8960_ADDCTL1 , 0x3);
 	return 0;
 }
 
@@ -143,6 +147,8 @@ static int avlite_wm8960_hifi_startup(struct snd_pcm_substream *substream)
 
        cpu_dai->playback.channels_min = 2;
        cpu_dai->playback.channels_max = 2;
+       cpu_dai->capture.channels_min = 2;
+       cpu_dai->capture.channels_max = 2;
 
 	__raw_writel(0xE1C0003F, ssp->mmio_base + SSCR0);
 	__raw_writel(0x00701DC0, ssp->mmio_base + SSCR1);
