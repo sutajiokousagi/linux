@@ -63,13 +63,10 @@
 #undef TTC_Z0_SUPPORT
 /* #define L2_CACHE_PREFETCH_DISABLE */
 
-#define MOHAWK_CPU_CONF	0xd4282c08
-
 	.text
 /*
  * cpu_mohawk_proc_init()
  */
-
 ENTRY(cpu_mohawk_proc_init)
 	mov	pc, lr
 
@@ -566,12 +563,6 @@ __mohawk_setup:
 	orr	r5, r5, #(1<<29)		@ streaming enable
 	orr     r5, r5, #0x700                  @ 8-wait cycles write coalesce
 	mcr     p15, 1, r5, c15, c1, 0          @ set extra features register
-
-	@ Must disable write buffer merge due to PJ1 bug in afifo_merge logic
-	ldr	r6, =MOHAWK_CPU_CONF
-	ldr	r5, [r6]
-	orr	r5, r5, #(1<<5)			@ disable write buffer merge
-	str	r5, [r6]
 
 	mov	pc, lr
 	.size	__mohawk_setup, . - __mohawk_setup
