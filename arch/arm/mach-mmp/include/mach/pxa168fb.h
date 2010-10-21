@@ -14,6 +14,9 @@
 /*              Header Files                      */
 /* ---------------------------------------------- */
 #include <linux/fb.h>
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+#endif
 /* ---------------------------------------------- */
 /*              IOCTL Definition                  */
 /* ---------------------------------------------- */
@@ -336,6 +339,9 @@ struct pxa168fb_info {
          */
         unsigned                mem_status:1;
         struct pxa168_fb_chroma chroma;
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	struct early_suspend early_suspend;
+#endif
 };
 
 /*

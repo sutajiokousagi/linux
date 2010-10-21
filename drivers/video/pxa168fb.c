@@ -33,6 +33,10 @@
 #include <linux/err.h>
 #include <linux/uaccess.h>
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+#endif
+
 #include <mach/io.h>
 #include <mach/irqs.h>
 #include <mach/pxa168fb.h>
@@ -93,6 +97,12 @@ static unsigned int max_fb_size = 0;
 static int _pxa168fb_resume(struct pxa168fb_info *fbi);
 static int _pxa168fb_suspend(struct pxa168fb_info *fbi, pm_message_t mesg);
 #endif
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void pxa168fb_early_suspend(struct early_suspend *h);
+static void pxa168fb_late_resume(struct early_suspend *h);
+#endif
+
 
 void pxa168fb_spi_send(struct pxa168fb_info *fbi, void *value, int count, unsigned int spi_gpio_cs)
 {
@@ -1334,6 +1344,18 @@ static int __init pxa168fb_probe(struct platform_device *pdev)
                 " to /dev/fb%d <%s>.\n", info->node, info->fix.id);
 
 	pxa168fb_power(fbi, mi, 1);
+
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	/*
+	 * Resigter early suspend for android
+	 */
+	fbi->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN;
+	fbi->early_suspend.suspend = pxa168fb_early_suspend;
+	fbi->early_suspend.resume = pxa168fb_late_resume;
+	register_early_suspend(&fbi->early_suspend);
+#endif
+
 	return 0;
 
 failed_free_irq:
@@ -1449,6 +1471,24 @@ static int pxa168fb_resume(struct platform_device *pdev)
 	struct pxa168fb_info *fbi = platform_get_drvdata(pdev);
 	_pxa168fb_resume(fbi);
 	return 0;
+}
+#endif
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void pxa168fb_early_suspend(struct early_suspend *h)
+{
+	struct pxa168fb_info *fbi;
+	fbi = container_of(h, struct pxa168fb_info, early_suspend);
+
+	_pxa168fb_suspend(fbi, PMSG_SUSPEND);
+}
+
+static void pxa168fb_late_resume(struct early_suspend *h)
+{
+	struct pxa168fb_info *fbi;
+	fbi = container_of(h, struct pxa168fb_info, early_suspend);
+
+	_pxa168fb_resume(fbi);
 }
 #endif
 
