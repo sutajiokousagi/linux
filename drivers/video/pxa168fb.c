@@ -1499,8 +1499,10 @@ static struct platform_driver pxa168fb_driver = {
 	},
 	.probe		= pxa168fb_probe,
 #ifdef CONFIG_PM
+#ifndef CONFIG_HAS_EARLYSUSPEND
 	.suspend	= pxa168fb_suspend,
 	.resume		= pxa168fb_resume,
+#endif
 #endif
 };
 
