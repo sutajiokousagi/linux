@@ -201,9 +201,6 @@ static struct rfkill * sd8x_rfkill_register(struct device *parent,
 	if (!dev)
 		goto err_out;
 
-	/* init device software states, and block it by default */
-	rfkill_init_sw_state(dev, true);
-
 	err = rfkill_register(dev);
 	if (err)
 		goto err_out;
@@ -281,9 +278,11 @@ static int sd8x_rfkill_suspend(struct platform_device *pdev, pm_message_t pm_sta
 	/* For WIFI module is totally powered off, we need marked state
 	 * as blocked so as to trigger re-download firmware
 	 * when rfkill framework restore original active status */
-	if(PM_EVENT_SUSPEND == pm_state.event){
-		rfkill_set_sw_state(pdata->wlan_rfkill, true);
-		rfkill_set_sw_state(pdata->bt_rfkill, true);
+	if (PM_EVENT_SUSPEND == pm_state.event) {
+		if (local_sd8x_data[RFKILL_TYPE_WLAN]->blocked == false)
+			local_sd8x_data[RFKILL_TYPE_WLAN]->blocked = true;
+		if (local_sd8x_data[RFKILL_TYPE_BLUETOOTH]->blocked == false)
+			local_sd8x_data[RFKILL_TYPE_BLUETOOTH]->blocked = true;
 	}
 
 	return 0;
