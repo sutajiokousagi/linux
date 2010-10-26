@@ -1724,8 +1724,9 @@ int sdhci_resume_host(struct sdhci_host *host)
 	sdhci_init(host, (host->mmc->pm_flags & MMC_PM_KEEP_POWER));
 	mmiowb();
 
-	ret = mmc_resume_host(host->mmc);
 	sdhci_enable_card_detection(host);
+
+	ret = mmc_resume_host(host->mmc);
 
 	return ret;
 }
