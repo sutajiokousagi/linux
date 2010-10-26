@@ -89,6 +89,9 @@ MODULE_SUPPORTED_DEVICE("Video");
 
 #define DMA_POOL 0
 #define MAX_DMA_BUFS 3
+/* max dma buffer can be access by user point*/
+#define DMA_TO_USER_POINT     10
+
 static int alloc_bufs_at_read = 0;
 module_param(alloc_bufs_at_read, bool, 0444);
 MODULE_PARM_DESC(alloc_bufs_at_read,
@@ -140,6 +143,12 @@ enum ccic_state {
 	S_STREAMING	/* Streaming data */
 };
 
+struct yuv_pointer_t {
+	dma_addr_t y;
+	dma_addr_t u;
+	dma_addr_t v;
+};
+
 /*
  * Tracking of streaming I/O buffers.
  */
@@ -150,6 +159,8 @@ struct ccic_sio_buffer {
 	int mapcount;
 	struct ccic_camera *cam;
 	struct vm_area_struct *svma;
+	dma_addr_t dma_handles;
+	struct yuv_pointer_t yuv_p;
 };
 
 /*
@@ -186,6 +197,9 @@ struct ccic_camera
 	int order[MAX_DMA_BUFS];	/* Internal buffer addresses */
 	void *dma_bufs[MAX_DMA_BUFS];	/* Internal buffer addresses */
 	dma_addr_t dma_handles[MAX_DMA_BUFS]; /* Buffer bus addresses */
+	void *rubbish_buf_virt;
+	dma_addr_t rubbish_buf_phy;
+	void *dma_bufs_user_pt[DMA_TO_USER_POINT];
 	unsigned int specframes;	/* Unconsumed spec frames (dev_lock) */
 	unsigned int sequence;		/* Frame sequence number */
 	unsigned int buf_seq[MAX_DMA_BUFS]; /* Sequence for individual buffers */
@@ -195,6 +209,7 @@ struct ccic_camera
 	struct ccic_sio_buffer *sb_bufs; /* The array of housekeeping structs */
 	struct list_head sb_avail;	/* Available for data (we own) (dev_lock) */
 	struct list_head sb_full;	/* With data (user space owns) (dev_lock) */
+	struct list_head sb_dma;	/* dma list (dev_lock) */
 	struct tasklet_struct s_tasklet;
 
 	/* Current operating parameters */
@@ -211,6 +226,9 @@ struct ccic_camera
 	struct dentry *dfs_regs;
 	struct dentry *dfs_cam_regs;
 #endif
+	unsigned long io_type;
+	unsigned int n_map_bufs;	/* How many buffer from user point */
+
 };
 
 #define BUS_PARALLEL 0x01
@@ -371,6 +389,50 @@ static inline void ccic_reg_set_bit(struct ccic_camera *cam,
 {
 	ccic_reg_write_mask(cam, reg, val, val);
 }
+/* only for debug */
+#if 0
+static int dump_register(struct ccic_camera *cam)
+{
+	unsigned int irqs;
+	spin_lock(&cam->dev_lock);
+	irqs = ccic_reg_read(cam, REG_IRQSTAT);
+	printk("CCIC: REG_IRQSTAT is %x\n", irqs);
+	irqs = ccic_reg_read(cam, REG_IRQSTATRAW);
+	printk("CCIC: REG_IRQSTATRAW is %x\n", irqs);
+	irqs = ccic_reg_read(cam, REG_IRQMASK);
+	printk("CCIC: REG_IRQMASK is %x\n\n", irqs);
+	irqs = ccic_reg_read(cam, REG_IMGPITCH);
+	printk("CCIC: REG_IMGPITCH is %x\n", irqs);
+	irqs = ccic_reg_read(cam, REG_IMGSIZE);
+	printk("CCIC: REG_IMGSIZE is %x\n", irqs);
+	irqs = ccic_reg_read(cam, REG_IMGOFFSET);
+	printk("CCIC: REG_IMGOFFSET is %x\n\n", irqs);
+	irqs = ccic_reg_read(cam, REG_CTRL0);
+	printk("CCIC: REG_CTRL0 is %x\n", irqs);
+	irqs = ccic_reg_read(cam, REG_CTRL1);
+	printk("CCIC: REG_CTRL1 is %x\n", irqs);
+	irqs = ccic_reg_read(cam, REG_CLKCTRL);
+	printk("CCIC: REG_CLKCTRL is %x\n\n", irqs);
+
+	irqs = ccic_reg_read(cam, REG_CSI2_DPHY3);
+	printk("CCIC: REG_CSI2_DPHY3 is %x\n", irqs);
+	irqs = ccic_reg_read(cam, REG_CSI2_DPHY5);
+	printk("CCIC: REG_CSI2_DPHY5 is %x\n\n", irqs);
+	irqs = ccic_reg_read(cam, REG_CSI2_DPHY6);
+	printk("CCIC: REG_CSI2_DPHY6 is %x\n\n", irqs);
+	irqs = ccic_reg_read(cam, REG_CSI2_CTRL0);
+	printk("CCIC: REG_CSI2_CTRL0 is %x\n\n", irqs);
+	irqs = ccic_reg_read(cam, REG_Y0BAR);
+	printk(KERN_ERR"REG_Y0BAR 0x%08x\n", irqs);
+	irqs = ccic_reg_read(cam, REG_Y0BAR + 4);
+	printk(KERN_ERR"REG_Y0BAR 0x%08x\n", irqs);
+	irqs = ccic_reg_read(cam, REG_Y0BAR + 8);
+	printk(KERN_ERR"REG_Y0BAR 0x%08x\n", irqs);
+	spin_unlock(&cam->dev_lock);
+
+	return 0;
+}
+#endif
 
 /*provided for sensor calling to enable clock at begining of probe*/
 void ccic_set_clock(unsigned int reg, unsigned int val)
@@ -520,9 +582,9 @@ int ccic_sensor_attach(struct i2c_client *client)
 			cam->bus_type[SENSOR_HIGH] = BUS_MIPI;
 		sensor_selected = SENSOR_HIGH;	/* Set default sensor */
 	} else if (cam->sensor_type == V4L2_IDENT_OV7740) {
-		cam->sensors[SENSOR_LOW] = client;
+		cam->sensors[SENSOR_HIGH] = client;
 		detected_low = 1;
-		sensor_selected = SENSOR_LOW;	/* Set default sensor */
+		sensor_selected = SENSOR_HIGH;	/* Set default sensor */
 		printk(KERN_ERR "camera: ov7740 attached\n");
 	} else {
                 cam_err(cam, "Unsupported sensor type %d at addr 0x%x", cam->sensor_type, cam->sensor->addr);
@@ -541,16 +603,142 @@ int ccic_sensor_attach(struct i2c_client *client)
 }
 EXPORT_SYMBOL (ccic_sensor_attach);
 
+#if 0
+static int ccic_sensor_detach(struct i2c_client *client)
+{
+	struct ccic_camera *cam;
+
+	cam = ccic_find_dev(0);
+	if (cam == NULL)
+		return -ENODEV;
+
+	if (cam->sensor == client) {
+		ccic_ctlr_stop_dma(cam);
+		ccic_ctlr_power_down(cam);
+		cam_err(cam, "lost the sensor!\n");
+		cam->sensor = NULL;  /* Bummer, no camera */
+		cam->state = S_NOTREADY;
+	}
+	return 0;
+}
+#endif
+
 /* ------------------------------------------------------------------- */
 /*
  * Deal with the controller.
  */
+static void ccic_switch_dma(struct ccic_camera *cam, int frame)
+{
+	struct ccic_sio_buffer *sbuf, *newsbuf;
+	unsigned long flags;
+	dma_addr_t phy;
+	clear_bit(frame, &cam->flags);
+	/*
+	 * if the buffer is dequeued, try to fetch one buffer from avail list
+	 * if the buffer is in avail list, move form avail list to full list,
+	 *	dequeue the buffer at the same time to protect
+	 */
 
-/*
- * Do everything we think we need to have the interface operating
- * according to the desired format.
- */
-static void ccic_ctlr_dma(struct ccic_camera *cam)
+	phy = ccic_reg_read(cam, REG_Y0BAR + (frame<<2));
+	/* rubbish got data */
+	if (cam->rubbish_buf_phy == phy) {
+		/* the buffer is dequeued */
+		if (list_empty(&cam->sb_avail))
+			goto out;
+
+		sbuf = list_entry(cam->sb_avail.next,
+				struct ccic_sio_buffer, list);
+		spin_lock_irqsave(&cam->dev_lock, flags);
+		ccic_reg_write(cam, REG_Y0BAR + (frame<<2), sbuf->yuv_p.y);
+		ccic_reg_write(cam, REG_U0BAR + (frame<<2), sbuf->yuv_p.u);
+		ccic_reg_write(cam, REG_V0BAR + (frame<<2), sbuf->yuv_p.v);
+		list_move_tail(&sbuf->list, &cam->sb_dma);
+		spin_unlock_irqrestore(&cam->dev_lock, flags);
+
+	} else {  /* got the real data */
+		list_for_each_entry(sbuf, &cam->sb_dma, list) {
+			/* find the match sbuf */
+			if (phy == sbuf->dma_handles) {
+				/* no more dma buffer */
+				if (list_empty(&cam->sb_avail)) {
+					spin_lock_irqsave(&cam->dev_lock,
+							  flags);
+					printk(KERN_DEBUG
+					       "CCIC link to rubbish buffer\n");
+					ccic_reg_write(cam,
+						       REG_Y0BAR + (frame << 2),
+						       cam->rubbish_buf_phy);
+					ccic_reg_write(cam,
+						       REG_U0BAR + (frame << 2),
+						       cam->rubbish_buf_phy);
+					ccic_reg_write(cam,
+						       REG_V0BAR + (frame << 2),
+						       cam->rubbish_buf_phy);
+					spin_unlock_irqrestore(&cam->dev_lock,
+							       flags);
+				} else {
+					newsbuf = list_entry(cam->sb_avail.next,
+							struct ccic_sio_buffer,
+							list);
+					spin_lock_irqsave(&cam->dev_lock,
+							  flags);
+
+					ccic_reg_write(cam,
+						       REG_Y0BAR + (frame << 2),
+						       newsbuf->yuv_p.y);
+					ccic_reg_write(cam,
+						       REG_U0BAR + (frame << 2),
+						       newsbuf->yuv_p.u);
+					ccic_reg_write(cam,
+						       REG_V0BAR + (frame << 2),
+						       newsbuf->yuv_p.v);
+					list_move_tail(&newsbuf->list,
+						       &cam->sb_dma);
+					spin_unlock_irqrestore(&cam->dev_lock,
+							       flags);
+				}
+				dma_sync_single_for_device(&cam->pdev->dev,
+						sbuf->dma_handles,
+						sbuf->v4lbuf.length,
+						DMA_FROM_DEVICE);
+
+				if ((cam->pix_format.pixelformat ==
+				     V4L2_PIX_FMT_JPEG)
+				    &&
+				    ((((char *)cam->
+				       dma_bufs_user_pt[frame])[0] != 0xff)
+				     ||
+				     (((char *)cam->
+				       dma_bufs_user_pt[frame])[1] != 0xd8))) {
+					printk(KERN_ERR
+					       "%s: JPEG ERROR !!! dropped this"
+					       "frame\n", __func__);
+					goto out;
+				}
+
+				sbuf->v4lbuf.sequence = cam->buf_seq[frame];
+				sbuf->v4lbuf.bytesused =
+				    cam->pix_format.sizeimage;
+				sbuf->v4lbuf.flags &= ~V4L2_BUF_FLAG_QUEUED;
+				sbuf->v4lbuf.flags |= V4L2_BUF_FLAG_DONE;
+
+				cam->next_buf = frame;
+				list_move_tail(&sbuf->list, &cam->sb_full);
+				if (!list_empty(&cam->sb_full)) {
+					clear_bit(CF_DMA_ACTIVE, &cam->flags);
+					wake_up(&cam->iowait);
+				}
+
+				goto out;
+			}
+		}
+
+	}
+out:
+	return;
+}
+
+static int ccic_ctlr_dma_mmap(struct ccic_camera *cam)
 {
 	struct v4l2_pix_format *fmt = &cam->pix_format;
 
@@ -591,6 +779,38 @@ static void ccic_ctlr_dma(struct ccic_camera *cam)
 	}
 	else
 		ccic_reg_set_bit(cam, REG_CTRL1, C1_TWOBUFS);
+
+	return 0;
+}
+
+static int ccic_ctlr_dma(struct ccic_camera *cam)
+{
+	int frame = 0;
+	unsigned long flags;
+	struct ccic_sio_buffer *sbuf;
+	if (cam->n_map_bufs < 2) {
+		printk(KERN_ERR "ccic at least 2 dma buffers\n");
+		return -ENOMEM;
+	}
+	spin_lock_irqsave(&cam->dev_lock, flags);
+	for (frame = 0; frame < cam->n_map_bufs; frame++) {
+		/* suppose only 3 buffers queued */
+		if (MAX_DMA_BUFS == frame)
+			break;
+		sbuf = cam->sb_bufs + frame;
+		ccic_reg_write(cam, REG_Y0BAR + (frame << 2), sbuf->yuv_p.y);
+		ccic_reg_write(cam, REG_U0BAR + (frame << 2), sbuf->yuv_p.u);
+		ccic_reg_write(cam, REG_V0BAR + (frame << 2), sbuf->yuv_p.v);
+
+		list_move_tail(&sbuf->list, &cam->sb_dma);
+	}
+	spin_unlock_irqrestore(&cam->dev_lock, flags);
+	if (cam->nbufs > 2)
+		ccic_reg_clear_bit(cam, REG_CTRL1, C1_TWOBUFS);
+	else
+		ccic_reg_set_bit(cam, REG_CTRL1, C1_TWOBUFS);
+
+	return 0;
 }
 
 static void ccic_ctlr_image(struct ccic_camera *cam)
@@ -600,39 +820,45 @@ static void ccic_ctlr_image(struct ccic_camera *cam)
 	int widthy = 0, widthuv = 0;
 
 	if (fmt->pixelformat == V4L2_PIX_FMT_YUV420)
-		imgsz = ((fmt->height << IMGSZ_V_SHIFT) & IMGSZ_V_MASK) | (((fmt->bytesperline)*4/3) & IMGSZ_H_MASK);
+		imgsz =
+		    ((fmt->height << IMGSZ_V_SHIFT) & IMGSZ_V_MASK) |
+		    (((fmt->bytesperline)
+		      * 4 / 3) & IMGSZ_H_MASK);
 	else
-		imgsz = ((fmt->height << IMGSZ_V_SHIFT) & IMGSZ_V_MASK) | (fmt->bytesperline & IMGSZ_H_MASK);
+		imgsz =
+		    ((fmt->
+		      height << IMGSZ_V_SHIFT) & IMGSZ_V_MASK) |
+		    (fmt->bytesperline & IMGSZ_H_MASK);
 	printk("%s: CCIC input image size is %x\n", __func__, imgsz);
-		/* YPITCH just drops the last two bits */
-	//ccic_reg_write_mask(cam, REG_IMGPITCH, fmt->bytesperline,
-	//		IMGP_YP_MASK);
+	/* YPITCH just drops the last two bits */
+	/* ccic_reg_write_mask(cam, REG_IMGPITCH, fmt->bytesperline,
+	IMGP_YP_MASK); */
 	switch (fmt->pixelformat) {
 	case V4L2_PIX_FMT_YUYV:
-            widthy = fmt->width*2;
-            widthuv = fmt->width*2;
-	    break;
+		widthy = fmt->width * 2;
+		widthuv = fmt->width * 2;
+		break;
 	case V4L2_PIX_FMT_RGB565:
-	    widthy = fmt->width*2;
-	    widthuv = 0;
-	    break;
+		widthy = fmt->width * 2;
+		widthuv = 0;
+		break;
 	case V4L2_PIX_FMT_JPEG:
-		if (BUS_IS_MIPI(cam->bus_type[sensor_selected])){
+		if (BUS_IS_MIPI(cam->bus_type[sensor_selected])) {
 			widthy = 0;
 			widthuv = 0;
 			imgsz = 0x1fff3fff;
-		}else{/* same as 422pack for parallel */
-			widthy = fmt->width*2;
-			widthuv = fmt->width*2;
+		} else {	/* same as 422pack for parallel */
+			widthy = fmt->width * 2;
+			widthuv = fmt->width * 2;
 		}
-		break; 
+		break;
 	case V4L2_PIX_FMT_YUV422P:
-                widthy = fmt->width;
-                widthuv = fmt->width/2;
+		widthy = fmt->width;
+		widthuv = fmt->width / 2;
 		break;
 	case V4L2_PIX_FMT_YUV420:
 		widthy = fmt->width;
-		widthuv = fmt->width/2;
+		widthuv = fmt->width / 2;
 		break;
 	default:
 		break;
@@ -656,10 +882,22 @@ static void ccic_ctlr_image(struct ccic_camera *cam)
             break;
 
 	case V4L2_PIX_FMT_YUYV:
-	case V4L2_PIX_FMT_JPEG:		//C0_YUV_PACKED must be set for JPEG?!
+	    /*the endianness of sensor output is UYVY(Y1CrY0Cb)*/
 	    ccic_reg_write_mask(cam, REG_CTRL0,
-			    C0_DF_YUV|C0_YUV_PACKED|C0_YUVE_YUYV,	/*the endianness of sensor output is UYVY(Y1CrY0Cb)*/
+			    C0_DF_YUV|C0_YUV_PACKED|C0_YUVE_YUYV,
 			    C0_DF_MASK);
+	    break;
+	case V4L2_PIX_FMT_JPEG:	/* C0_YUV_PACKED must be set for JPEG?! */
+		/* Set CTRL0 as 0x10a8 for JPEG */
+		if (BUS_IS_MIPI(cam->bus_type[sensor_selected])) {
+			ccic_reg_write_mask(cam, REG_CTRL0,
+				    C0_DF_RGB|C0_RGB_BGR|C0_RGB4_BGRX,
+				    C0_DF_MASK);
+	    } else {
+		    ccic_reg_write_mask(cam, REG_CTRL0,
+				    C0_DF_YUV|C0_YUV_PACKED|C0_YUVE_YUYV,
+				    C0_DF_MASK);
+	    }
 	    break;
 
 	case V4L2_PIX_FMT_RGB444:
@@ -694,12 +932,16 @@ static void ccic_ctlr_image(struct ccic_camera *cam)
 static int ccic_ctlr_configure(struct ccic_camera *cam)
 {
 	unsigned long flags;
+	int ret = 0;
 	spin_lock_irqsave(&cam->dev_lock, flags);
-	ccic_ctlr_dma(cam);
+	if (V4L2_MEMORY_USERPTR == cam->io_type)
+		ret = ccic_ctlr_dma(cam);
+	else if (V4L2_MEMORY_MMAP == cam->io_type)
+		ret = ccic_ctlr_dma_mmap(cam);
 	ccic_ctlr_image(cam);
 	ccic_set_config_needed(cam, 0);
 	spin_unlock_irqrestore(&cam->dev_lock, flags);
-	return 0;
+	return ret;
 }
 
 static void ccic_ctlr_irq_enable(struct ccic_camera *cam)
@@ -770,10 +1012,6 @@ static void ccic_ctlr_stop_dma(struct ccic_camera *cam)
 	 * or not).  Delay briefly just in case we race with the SOF
 	 * interrupt, then wait until no DMA is active.
 	 */
-	spin_lock_irqsave(&cam->dev_lock, flags);
-	ccic_ctlr_stop(cam);
-	spin_unlock_irqrestore(&cam->dev_lock, flags);
-	mdelay(1);
 	wait_event_timeout(cam->iowait,
 			!test_bit(CF_DMA_ACTIVE, &cam->flags), HZ);
 	if (test_bit(CF_DMA_ACTIVE, &cam->flags))
@@ -781,6 +1019,7 @@ static void ccic_ctlr_stop_dma(struct ccic_camera *cam)
 		/* This would be bad news - what now? */
 	spin_lock_irqsave(&cam->dev_lock, flags);
 
+	ccic_ctlr_stop(cam);
 	/*CSI2/DPHY need to be cleared, or no EOF will be received*/
 	ccic_reg_write(cam, REG_CSI2_DPHY3, 0x0);
 	ccic_reg_write(cam, REG_CSI2_DPHY6, 0x0);
@@ -850,7 +1089,7 @@ static int __ccic_cam_reset(struct ccic_camera *cam)
 static int ccic_cam_configure(struct ccic_camera *cam)
 {
 	struct v4l2_format fmt;
-	int ret, zero = 0;
+	int ret = 0;
 
 	if (cam->state != S_IDLE)
 		return -EINVAL;
@@ -882,8 +1121,8 @@ static int ccic_alloc_dma_bufs(struct ccic_camera *cam, int loadtime)
 		cam->dma_buf_size = dma_buf_size;
 	else
 		cam->dma_buf_size = cam->pix_format.sizeimage;
-	if (n_dma_bufs > 3)
-		n_dma_bufs = 3;
+	if (n_dma_bufs > MAX_DMA_BUFS)
+		n_dma_bufs = MAX_DMA_BUFS;
 
 	cam->nbufs = 0;
 	for (i = 0; i < n_dma_bufs; i++) {
@@ -935,9 +1174,12 @@ static void ccic_free_dma_bufs(struct ccic_camera *cam)
 		dma_free_coherent(&cam->pdev->dev, cam->dma_buf_size,
 				cam->dma_bufs[i], cam->dma_handles[i]);
 #else
-		free_pages((unsigned long)cam->dma_bufs[i], cam->order[i]);
+		if (cam->dma_bufs[i]) {
+			free_pages((unsigned long)cam->dma_bufs[i],
+				   cam->order[i]);
 #endif
-		cam->dma_bufs[i] = NULL;
+			cam->dma_bufs[i] = NULL;
+		}
 	}
 	cam->nbufs = 0;
 }
@@ -1000,7 +1242,7 @@ static int ccic_read_setup(struct ccic_camera *cam, enum ccic_state state)
 	 * Configuration.  If we still don't have DMA buffers,
 	 * make one last, desperate attempt.
 	 */
-	if (cam->nbufs == 0)
+	if (cam->nbufs == 0 && V4L2_MEMORY_MMAP == cam->io_type)
 		if (ccic_alloc_dma_bufs(cam, 0))
 			return -ENOMEM;
 
@@ -1193,6 +1435,69 @@ static int ccic_setup_siobuf(struct ccic_camera *cam, int index)
 	 */
 	buf->v4lbuf.m.offset = 2*index*buf->v4lbuf.length;
 	return 0;
+
+}
+
+unsigned long va_to_pa(unsigned long user_addr, unsigned int size);
+
+static int ccic_prepare_buffer_node(struct ccic_camera *cam,
+				    struct ccic_sio_buffer *buf,
+				    unsigned long userptr, unsigned int size,
+				    unsigned int index)
+{
+	unsigned int vaddr = PAGE_ALIGN(userptr);
+	struct v4l2_pix_format *fmt = &cam->pix_format;
+
+	buf->dma_handles = va_to_pa(vaddr, size);
+	if (!buf->dma_handles) {
+		printk("mem is not contiguous\n");
+		return -ENOMEM;
+	}
+	buf->buffer = ioremap(buf->dma_handles, PAGE_ALIGN(size));
+	cam->dma_bufs_user_pt[index] = buf->buffer;
+
+	memset(buf->buffer, 0, size);
+
+	INIT_LIST_HEAD(&buf->list);
+	buf->v4lbuf.length = PAGE_ALIGN(size);
+	buf->mapcount = 0;
+
+	buf->v4lbuf.index = index;
+	buf->v4lbuf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+	buf->v4lbuf.field = V4L2_FIELD_NONE;
+	buf->v4lbuf.memory = V4L2_MEMORY_USERPTR;
+	buf->v4lbuf.m.offset = 2*index*buf->v4lbuf.length;
+
+	if (fmt->pixelformat == V4L2_PIX_FMT_YUV422P) {
+		buf->yuv_p.y = buf->dma_handles;
+		buf->yuv_p.u = buf->yuv_p.y + fmt->width*fmt->height;
+		buf->yuv_p.v = buf->yuv_p.u + fmt->width*fmt->height/2;
+	} else if (fmt->pixelformat == V4L2_PIX_FMT_YUV420) {
+		buf->yuv_p.y = buf->dma_handles;
+		buf->yuv_p.u = buf->yuv_p.y + fmt->width*fmt->height;
+		buf->yuv_p.v = buf->yuv_p.u + fmt->width*fmt->height/4;
+	} else {
+		buf->yuv_p.y = buf->dma_handles;
+		buf->yuv_p.u = 0;
+		buf->yuv_p.v = 0;
+	}
+	return 0;
+}
+
+static void ccic_free_buffer_node(struct ccic_sio_buffer *sbuf)
+{
+	/*
+	 * vunmap will do TLB flush for us.
+	 * We map uncachable memory, so needn't cache invalid operation here.
+	 */
+
+	if (V4L2_MEMORY_USERPTR != sbuf->v4lbuf.memory)
+		return;
+
+	if (sbuf->buffer) {
+		iounmap(sbuf->buffer);
+		sbuf->buffer = NULL;
+	}
 }
 
 static int ccic_free_sio_buffers(struct ccic_camera *cam)
@@ -1202,19 +1507,30 @@ static int ccic_free_sio_buffers(struct ccic_camera *cam)
 	/*
 	 * If any buffers are mapped, we cannot free them at all.
 	 */
-	for (i = 0; i < cam->n_sbufs; i++)
+	for (i = 0; i < cam->n_sbufs; i++) {
 		if (cam->sb_bufs[i].mapcount > 0)
 			return -EBUSY;
+		ccic_free_buffer_node(&cam->sb_bufs[i]);
+	}
+	cam->n_map_bufs = 0;
 	/*
 	 * OK, let's do it.
 	 */
-	for (i = 0; i < cam->n_sbufs; i++)
-		vfree(cam->sb_bufs[i].buffer);
+	for (i = 0; i < cam->n_sbufs; i++) {
+		if (V4L2_MEMORY_MMAP == cam->sb_bufs[i].v4lbuf.memory
+		    && cam->sb_bufs[i].buffer) {
+			vfree(cam->sb_bufs[i].buffer);
+			cam->sb_bufs[i].buffer = NULL;
+		}
+	}
 	cam->n_sbufs = 0;
-	kfree(cam->sb_bufs);
-	cam->sb_bufs = NULL;
+	if (cam->sb_bufs) {
+		kfree(cam->sb_bufs);
+		cam->sb_bufs = NULL;
+	}
 	INIT_LIST_HEAD(&cam->sb_avail);
 	INIT_LIST_HEAD(&cam->sb_full);
+	INIT_LIST_HEAD(&cam->sb_dma);
 	return 0;
 }
 
@@ -1232,6 +1548,19 @@ static int ccic_vidioc_reqbufs(struct file *filp, void *priv,
 	 */
 	if (req->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
 		return -EINVAL;
+	if (req->memory == V4L2_MEMORY_USERPTR) {
+		if (cam->state != S_IDLE
+			|| (cam->owner && cam->owner != filp)) {
+			ret = -EBUSY;
+			return ret;
+		}
+		cam->io_type = V4L2_MEMORY_USERPTR;
+		cam->owner = filp;
+		/* we do not need kernel to alloc the DAM buffer */
+		ccic_free_dma_bufs(cam);
+		ret = ccic_free_sio_buffers(cam);
+		return ret;
+	}
 	if (req->memory != V4L2_MEMORY_MMAP)
 		return -EINVAL;
 	/*
@@ -1255,6 +1584,7 @@ static int ccic_vidioc_reqbufs(struct file *filp, void *priv,
 		goto out;
 	}
 	cam->owner = filp;
+	cam->io_type = V4L2_MEMORY_MMAP;
 
 	if (req->count < min_buffers)
 		req->count = min_buffers;
@@ -1317,8 +1647,17 @@ static int ccic_vidioc_qbuf(struct file *filp, void *priv,
 	mutex_lock(&cam->s_mutex);
 	if (buf->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
 		goto out;
-	if (buf->index < 0 || buf->index >= cam->n_sbufs)
-		goto out;
+
+	if (NULL == cam->sb_bufs) {
+		cam->sb_bufs =
+		    kzalloc(max_buffers * sizeof(struct ccic_sio_buffer),
+			    GFP_KERNEL);
+		if (cam->sb_bufs == NULL) {
+			ret = -ENOMEM;
+			goto out;
+		}
+
+	}
 	sbuf = cam->sb_bufs + buf->index;
 	if (sbuf->v4lbuf.flags & V4L2_BUF_FLAG_QUEUED) {
 		ret = 0; /* Already queued?? */
@@ -1329,13 +1668,41 @@ static int ccic_vidioc_qbuf(struct file *filp, void *priv,
 		ret = -EBUSY;
 		goto out;
 	}
+
+	if ((buf->memory == V4L2_MEMORY_USERPTR)
+			&& (buf->index == cam->n_sbufs)) {
+		if (buf->length < cam->pix_format.sizeimage) {
+			printk(KERN_ERR "prepare buffer, size is not enough\n");
+			goto out;
+		}
+
+		if (buf->index > max_buffers) {
+			printk(KERN_ERR "Only %d buffers are supported\n",
+			       max_buffers);
+			goto out;
+		}
+
+		if (ccic_prepare_buffer_node(cam, sbuf,
+					     buf->m.userptr, buf->length,
+					     buf->index)) {
+			ret = -EINVAL;
+			goto out;
+		}
+		cam->n_map_bufs++;
+		cam->n_sbufs++;
+	} else {
+		if (buf->index < 0 || buf->index >= cam->n_sbufs)
+			goto out;
+	}
 	sbuf->v4lbuf.flags |= V4L2_BUF_FLAG_QUEUED;
 	spin_lock_irqsave(&cam->dev_lock, flags);
 	list_add(&sbuf->list, &cam->sb_avail);
 	spin_unlock_irqrestore(&cam->dev_lock, flags);
 	ret = 0;
-
-	flush_cache_range(sbuf->svma, (unsigned long)sbuf->buffer, (unsigned long)sbuf->buffer + cam->pix_format.sizeimage);
+	if (buf->memory == V4L2_MEMORY_MMAP)
+		flush_cache_range(sbuf->svma, (unsigned long)sbuf->buffer,
+				  (unsigned long)(sbuf->buffer +
+						  cam->pix_format.sizeimage));
   out:
 	mutex_unlock(&cam->s_mutex);
 	return ret;
@@ -1476,6 +1843,13 @@ static int ccic_v4l_open(struct file *filp)
 
 	if (cam == NULL)
 		return -ENODEV;
+	/* sensor_selected should be 0 or 1 */
+
+	if (2 == sensor_selected) {
+		printk(KERN_ERR"no sensor detected !\n");
+		ret = -ENODEV;
+		return ret;
+	}
 #ifdef CONFIG_DVFM
 	dvfm_disable_op_name("apps_idle", dvfm_dev_idx);
 	dvfm_disable_op_name("apps_sleep", dvfm_dev_idx);
@@ -1537,8 +1911,7 @@ static int ccic_v4l_release(struct file *filp)
 //		if (detected_high == 1)		//only 7660 can be powered off
 //			pdata->power_off(1);
 		ccic_ctlr_power_down(cam);
-		if (alloc_bufs_at_read)
-			ccic_free_dma_bufs(cam);
+		ccic_free_dma_bufs(cam);
 	}
 	mutex_unlock(&cam->s_mutex);
 #ifdef CONFIG_DVFM
@@ -1741,9 +2114,8 @@ static int ccic_vidioc_s_fmt_cap(struct file *filp, void *priv,
 	/*
 	 * It looks like this might work, so let's program the sensor.
 	 */
+	ccic_set_config_needed(cam, 1);
 	ret = ccic_cam_configure(cam);
-	if (! ret)
-		ret = ccic_ctlr_configure(cam);
   out:
 	mutex_unlock(&cam->s_mutex);
 	return ret;
@@ -1933,7 +2305,7 @@ static long ccic_v4l_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 {
 	struct video_device *vdev = video_devdata(file);
 	struct ccic_camera *cam = container_of(vdev, struct ccic_camera, v4ldev);
-	long ret;
+	int ret;
 
 	/* Handle some specific cmds */
 	switch (cmd) {
@@ -1943,6 +2315,20 @@ static long ccic_v4l_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 						(struct v4l2_frmsizeenum *) arg);
 		return ret;
 	}
+#ifdef CONFIG_VIDEO_ADV_DEBUG
+	case VIDIOC_DBG_S_REGISTER:
+	{
+		ret = ccic_vidioc_s_register(file, (void *)cam,
+			(struct v4l2_dbg_register *)arg);
+		return ret;
+	}
+	case VIDIOC_DBG_G_REGISTER:
+	{
+		ret = ccic_vidioc_g_register(file, (void *)cam,
+			(struct v4l2_dbg_register *)arg);
+		return ret;
+	}
+#endif
 	default:
 		break;
 	}
@@ -2043,7 +2429,8 @@ static void ccic_frame_tasklet(unsigned long data)
 			break;  /* Leave it valid, hope for better later */
 		}
 		clear_bit(bufno, &cam->flags);
-#if !DMA_POOL
+#if 0
+/* !DMA_POOL */
 		dma_sync_single_for_device(&cam->pdev->dev,
 			cam->dma_handles[bufno],
 			cam->pix_format.sizeimage,
@@ -2063,6 +2450,11 @@ static void ccic_frame_tasklet(unsigned long data)
 		spin_unlock_irqrestore(&cam->dev_lock, flags);
 		memcpy(sbuf->buffer, cam->dma_bufs[bufno],
 				cam->pix_format.sizeimage);
+#if 0
+/* !DMA_POOL */
+		dmac_inv_range(cam->dma_bufs[bufno],
+				cam->dma_bufs[bufno] + cam->pix_format.sizeimage);
+#endif
 		if (cam->pix_format.pixelformat == V4L2_PIX_FMT_JPEG) {
 			/* we can not get line data in parallel mode for new frame vsync resets line register */
 			sbuf->v4lbuf.bytesused = cam->pix_format.bytesperline * lines;
@@ -2127,7 +2519,10 @@ static void ccic_frame_complete(struct ccic_camera *cam, int frame)
 	 * vidioc_dqbuf().
 	 */
 	    case S_STREAMING:
-		tasklet_schedule(&cam->s_tasklet);
+		if (V4L2_MEMORY_MMAP == cam->io_type)
+			tasklet_schedule(&cam->s_tasklet);
+		else if (V4L2_MEMORY_USERPTR == cam->io_type)
+			ccic_switch_dma(cam, frame);
 		break;
 
 	    default:
@@ -2148,23 +2543,33 @@ static void ccic_frame_irq(struct ccic_camera *cam, unsigned int irqs)
 	 * not be more than one of these, or we have fallen
 	 * far behind.
 	 */
-	for (frame = 0; frame < cam->nbufs; frame++)
+	for (frame = 0; frame < MAX_DMA_BUFS; frame++) {
 		if (irqs & (IRQ_EOF0 << frame))
 			ccic_frame_complete(cam, frame);
-
+	}
 	/* We workaround parallel interface JPEG mode. We can not detect EOF with IRQ, for JPEG file size is variable.
 	 * We set lines as large as that JPEG data never fullfill and use SOF as frame complete indication. */
 	if((cam->pix_format.pixelformat == V4L2_PIX_FMT_JPEG) &&
 			BUS_IS_PARALLEL(cam->bus_type[sensor_selected])){
-		for (frame = 0; frame < cam->nbufs; frame++){
+		for (frame = 0; frame < MAX_DMA_BUFS; frame++) {
 			/* collect data according to SOF flag */
 			if(sof & (1 << frame)){
-				if ((jpeg_cnt % 2) && ((((char *)cam->dma_bufs[frame])[0] != 0xff) || (((char *)cam->dma_bufs[frame])[1] != 0xd8))){
+				void **dma_bufs_temp = NULL;
+				if (V4L2_MEMORY_USERPTR == cam->io_type)
+					dma_bufs_temp = cam->dma_bufs_user_pt;
+				else
+					dma_bufs_temp = cam->dma_bufs;
+
+				if ((jpeg_cnt % 2)
+					&& ((((char *)dma_bufs_temp[frame])[0]
+					!= 0xff)
+					|| (((char *)dma_bufs_temp[frame])[1]
+					!= 0xd8))) {
 					jpeg_cnt ++;
 				}
 
 				lines = ccic_reg_read(cam, REG_LNNUM);
-				if(jpeg_cnt %2) /* drop even frames */
+				if (jpeg_cnt % 2) /* drop even frames */
 					ccic_frame_complete(cam, frame);
 				sof &= ~(1 << frame); /* mark this buffer is handled */
 			}
@@ -2243,11 +2648,13 @@ static void ccic_dfs_setup(void)
 	}
 }
 
+#if 0
 static void ccic_dfs_shutdown(void)
 {
 	if (ccic_dfs_root)
 		debugfs_remove(ccic_dfs_root);
 }
+#endif
 
 static int ccic_dfs_open(struct inode *inode, struct file *file)
 {
@@ -2372,6 +2779,7 @@ static int pxa910_camera_probe(struct platform_device *pdev)
 	cam = kzalloc(sizeof(struct ccic_camera), GFP_KERNEL);
 	if (cam == NULL)
 		goto out;
+	memset(cam, 0x00, sizeof(struct ccic_camera));
 	platform_set_drvdata(pdev, cam);
 	mutex_init(&cam->s_mutex);
 	mutex_lock(&cam->s_mutex);
@@ -2386,6 +2794,7 @@ static int pxa910_camera_probe(struct platform_device *pdev)
 	INIT_LIST_HEAD(&cam->sb_full);
 	tasklet_init(&cam->s_tasklet, ccic_frame_tasklet, (unsigned long) cam);
 
+	INIT_LIST_HEAD(&cam->sb_dma);
 	//cam_ctx->platform_ops = pdev->dev.platform_data;
 	//if (cam_ctx->platform_ops == NULL) {
 	//	printk("camera no platform data defined\n");
@@ -2453,6 +2862,17 @@ static int pxa910_camera_probe(struct platform_device *pdev)
 			cam_warn(cam, "Unable to alloc DMA buffers at load"
 					" will try again later.");
 	}
+
+	/* allocate rubbish buffer */
+	cam->rubbish_buf_virt =
+	    (void *)__get_free_pages(GFP_KERNEL, get_order(dma_buf_size));
+	if (!cam->rubbish_buf_virt) {
+		printk(KERN_ERR "Can't get memory for rubbish buffer\n");
+		return -ENOMEM;
+	} else {
+		cam->rubbish_buf_phy = __pa(cam->rubbish_buf_virt);
+	}
+
 	ccic_dfs_setup();
 	ccic_dfs_cam_setup(cam);
 	mutex_unlock(&cam->s_mutex);
@@ -2505,6 +2925,10 @@ static int pxa910_camera_remove(struct platform_device *pdev)
 		cam_warn(cam, "Removing a device with users!\n");
 	ccic_shutdown(cam);
 	/* No unlock - it no longer exists */
+	/* free rubbish buffer */
+	if (cam->rubbish_buf_virt)
+		free_pages((unsigned long)cam->rubbish_buf_virt,
+			   get_order(dma_buf_size));
 
 	return 0;
 }
