@@ -264,7 +264,7 @@ static int pxa3xx_pcm_open(struct snd_pcm_substream *substream)
 
 	prtd->dma_ch = -1;
 	prtd->dma_desc_array =
-		dma_alloc_writecombine(substream->pcm->card->dev, PAGE_SIZE,
+		dma_alloc_coherent(substream->pcm->card->dev, PAGE_SIZE,
 				&prtd->dma_desc_array_phys, GFP_KERNEL);
 	
 	if (!prtd->dma_desc_array) {
@@ -285,7 +285,7 @@ static int pxa3xx_pcm_close(struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct pxa3xx_runtime_data *prtd = runtime->private_data;
-	dma_free_writecombine(substream->pcm->card->dev, PAGE_SIZE,
+	dma_free_coherent(substream->pcm->card->dev, PAGE_SIZE,
 			prtd->dma_desc_array, prtd->dma_desc_array_phys);
 	kfree(prtd);
 	return 0;
@@ -296,7 +296,7 @@ static int pxa3xx_pcm_mmap(struct snd_pcm_substream *substream,
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 
-	return dma_mmap_writecombine(substream->pcm->card->dev, vma,
+	return dma_mmap_coherent(substream->pcm->card->dev, vma,
 				runtime->dma_area,
 				runtime->dma_addr,
 				runtime->dma_bytes);
@@ -323,7 +323,7 @@ static int pxa3xx_pcm_preallocate_dma_buffer(struct snd_pcm *pcm, int stream)
 	buf->dev.type = SNDRV_DMA_TYPE_DEV;
 	buf->dev.dev = pcm->card->dev;
 	buf->private_data = NULL;
-	buf->area = dma_alloc_writecombine(pcm->card->dev, size,
+	buf->area = dma_alloc_coherent(pcm->card->dev, size,
 				   &buf->addr, GFP_KERNEL);
 	if (!buf->area)
 		return -ENOMEM;
@@ -345,7 +345,7 @@ static void pxa3xx_pcm_free_dma_buffers(struct snd_pcm *pcm)
 		buf = &substream->dma_buffer;
 		if (!buf->area)
 			continue;
-		dma_free_writecombine(pcm->card->dev, buf->bytes,
+		dma_free_coherent(pcm->card->dev, buf->bytes,
 					buf->area, buf->addr);
 		buf->area = NULL;
 	}
