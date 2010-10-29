@@ -349,7 +349,7 @@ CONFIG_ALIGNMENT_TRAP=y
 #
 CONFIG_ZBOOT_ROM_TEXT=0x0
 CONFIG_ZBOOT_ROM_BSS=0x0
-CONFIG_CMDLINE="ubi.mtd=System ubi.mtd=Userdata ubi.mtd=MassStorage1 root=ubi0_0 rootfstype=ubifs ip=50.1.1.10:50.1.1.1::255.255.255.0::usb0:on console=ttyS0,115200 mem=256M uart_dma android"
+CONFIG_CMDLINE="ubi.mtd=System ubi.mtd=Userdata ubi.mtd=MassStorage1 root=ubi0_0 rootfstype=ubifs console=ttyS0,115200 mem=256M uart_dma android"
 # CONFIG_XIP_KERNEL is not set
 # CONFIG_KEXEC is not set
 
