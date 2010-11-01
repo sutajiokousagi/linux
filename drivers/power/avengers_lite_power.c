@@ -213,7 +213,7 @@ static void avengers_lite_work(struct work_struct *work)
 {
 	struct avengers_lite_device_info *di = container_of(work,
 			struct avengers_lite_device_info, monitor_work.work);
-	const int interval = 1;
+	const int interval = 5*HZ;	/* time until next check, unit: 10 mS */
 
 	dev_dbg(di->dev, "%s\n", __func__);
 
@@ -226,11 +226,12 @@ static void avengers_lite_work(struct work_struct *work)
 static void avengers_lite_external_power_changed(struct power_supply *psy)
 {
 	struct avengers_lite_device_info *di = to_avengers_lite_device_info(psy);
+	const int interval = 5*HZ;	/* time until next check, unit: 10 mS */
 
 	dev_dbg(di->dev, "%s\n", __func__);
 
 	cancel_delayed_work(&di->monitor_work);
-	queue_delayed_work(di->monitor_wqueue, &di->monitor_work, 1);
+	queue_delayed_work(di->monitor_wqueue, &di->monitor_work, interval);
 }
 
 static int avengers_lite_get_property(struct power_supply *psy,
@@ -384,6 +385,7 @@ static int avengers_lite_power_probe(struct platform_device *pdev)
 {
 	int retval = 0;
 	struct avengers_lite_device_info *di;
+	const int interval = 5*HZ;	/* time until next check, unit: 10 mS */
 
 	di = kzalloc(sizeof(*di), GFP_KERNEL);
 	if (!di) {
@@ -428,7 +430,7 @@ static int avengers_lite_power_probe(struct platform_device *pdev)
 		retval = -ESRCH;
 		goto workqueue_failed;
 	}
-	queue_delayed_work(di->monitor_wqueue, &di->monitor_work, 1);
+	queue_delayed_work(di->monitor_wqueue, &di->monitor_work, interval);
 
 	goto success;
 
@@ -441,6 +443,7 @@ ac_failed:
 di_alloc_failed:
 success:
 	return retval;
+
 }
 
 static int avengers_lite_power_remove(struct platform_device *pdev)
@@ -468,12 +471,13 @@ static int avengers_lite_power_suspend(struct platform_device *pdev,
 static int avengers_lite_power_resume(struct platform_device *pdev)
 {
 	struct avengers_lite_device_info *di = platform_get_drvdata(pdev);
+	const int interval = 5*HZ;	/* time until next check, unit: 10 mS */
 
 	di->ec_status = POWER_SUPPLY_STATUS_UNKNOWN;
 	power_supply_changed(&di->bat);
 
 	cancel_delayed_work(&di->monitor_work);
-	queue_delayed_work(di->monitor_wqueue, &di->monitor_work, HZ);
+	queue_delayed_work(di->monitor_wqueue, &di->monitor_work, interval);
 
 	return 0;
 }
