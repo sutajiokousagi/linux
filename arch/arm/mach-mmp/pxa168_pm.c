@@ -46,13 +46,13 @@
 #include <linux/slab.h>
 
 /*
-#define APB_PHYS_BASE           0xd4000000
-#define APB_VIRT_BASE           0xfe000000
-#define APB_PHYS_SIZE           0x00200000
+#define APB_PHYS_BASE	   0xd4000000
+#define APB_VIRT_BASE	   0xfe000000
+#define APB_PHYS_SIZE	   0x00200000
 
-#define AXI_PHYS_BASE           0xd4200000
-#define AXI_VIRT_BASE           0xfe200000
-#define AXI_PHYS_SIZE           0x00200000
+#define AXI_PHYS_BASE	   0xd4200000
+#define AXI_VIRT_BASE	   0xfe200000
+#define AXI_PHYS_SIZE	   0x00200000
 
 #define DMAC_REGS_VIRT		(APB_VIRT_BASE + 0x00000)
 
@@ -795,26 +795,39 @@ void pxa168_pm_enter_apps_sleep(void)
 void pxa168_pm_enter_sys_sleep(void)
 {
 	uint32_t icu_ap_gbl_irq_msk;
+	unsigned int icu_int_conf[64];
+	unsigned long flags;
+	int i;
+
+	for (i = 0; i < 64; i++) {
+		icu_int_conf[i] = __raw_readl(ICU_INT_CONF(i));
+		if (
+			(IRQ_PXA168_KEYPAD != i) &&
+			(IRQ_PXA168_TIMER1 != i) &&
+			(IRQ_PXA168_TIMER2 != i) &&
+			(IRQ_PXA168_TIMER3 != i)
+		)
+			__raw_writel(icu_int_conf[i]&0xfffffff8, \
+					ICU_INT_CONF(i));
+	}
 
 	/* step 1: set the wakeup source */
 	/*********************************************************************
-	 * unmask:	Keypress(21),
-	 * 		RTC_ALARM(17), AP1_TIMER_3(10), AP1_TIMER2(9),
-	 * 		AP1_TIMER1(8), WAKEUP4,3(4,3)
+	 * unmask:      Keypress(21,wk3),
+	 *	      RTC_ALARM(17,wk4),
+	 *	      AP1_TIMER3(10,wk4), AP1_TIMER2(9,wk4), AP1_TIMER1(8,wk4)
+	 *	      WAKEUP4,3(4,3)
 	 * note:	must mask WAKEUP5(5) and WAKEUP1(1)(for USB port)
 	 *********************************************************************/
-	__raw_writel(0x220718, MPMU_AWUCRM);
+	__raw_writel(0x00220718, MPMU_AWUCRM);
 
 	/* step 2: set the IDLE bit in the AP idle configuration register*/
-	/*********************************************************************
-	 * set:	DIS_MC_SW_REQ(21), MC_WAKE_EN(20), L2_RESETn(9), and IDLE(1)
-	 * *******************************************************************/
-	__raw_writel(0x300202, APMU_IDLE_CFG);
 	if(cpu_is_pxa168_A0()==0)
-		__raw_writel(0x28000000, APMU_PCR );	/* ensure SETALWAYS bits = 1 */
+		__raw_writel(0x28000000, APMU_PCR);    /* force SETALWAYS=1 */
 	else
-		__raw_writel(0x08000000, APMU_PCR );	/* ensure SETALWAYS bits = 1 */
+		__raw_writel(0x08000000, APMU_PCR);    /* force SETALWAYS=1 */
 
+	__raw_writel(0x300202, APMU_IDLE_CFG);
 
 	/* step 3: set the global interrupt mask in the ICU register to mask
 	 * the SYNC IRQ to the core */
@@ -835,9 +848,27 @@ void pxa168_pm_enter_sys_sleep(void)
 	*      SetAlways(25), SLPWP0,1,2,5,6,7(23,22,21,17,16,15),
 	*      SetAlways(14)
 	*********************************************************************/
-	__raw_writel(0xbee3c000, MPMU_APCR);
+	local_fiq_disable();
+	local_irq_save(flags);
 
-	pxa168_pm_swi();
+	pxa168_trigger_lpm(0xbee3c000);
+
+	local_irq_restore(flags);
+	local_fiq_enable();
+
+	/* retain the ext idle config as default */
+	__raw_writel(0x300202, APMU_IDLE_CFG);
+	__raw_writel(0x00000000, MPMU_APCR);
+
+	for (i = 0; i < 64; i++) {
+		if (
+			(IRQ_PXA168_KEYPAD != i) &&
+			(IRQ_PXA168_TIMER1 != i) &&
+			(IRQ_PXA168_TIMER2 != i) &&
+			(IRQ_PXA168_TIMER3 != i)
+		)
+			__raw_writel(icu_int_conf[i], ICU_INT_CONF(i));
+	}
 }
 
 void pxa168_pm_enter_sys_sleep_edge(void)

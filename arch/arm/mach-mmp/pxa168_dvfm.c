@@ -476,12 +476,12 @@ static const char *modify_op_help_text =
 	"    vcc_core\n"
 	"    name\n"
 	"    power_mode  - 0 = active\n"
-	"                - 1 = core_intidle\n"
-	"                - 2 = core_extidle\n"
-	"                - 3 = apps_idle\n"
-	"                - 4 = apps_sleep\n"
-	"                - 5 = sys_sleep\n"
-	"                - 6 = hibernate\n"
+	"		- 1 = core_intidle\n"
+	"		- 2 = core_extidle\n"
+	"		- 3 = apps_idle\n"
+	"		- 4 = apps_sleep\n"
+	"		- 5 = sys_sleep\n"
+	"		- 6 = hibernate\n"
 	"\n"
 ;
 
@@ -540,8 +540,8 @@ static int modify_op(void *driver_data, struct op_info *p, char *buf)
 
 
 	/* part the input buffer. it will be a series of triplets: */
-	/* id = val                                                */
-	/* whitespace on either side of the = is mandatory.        */
+	/* id = val						*/
+	/* whitespace on either side of the = is mandatory.	*/
 	while (1) {
 		rc = cp = 0;
 		*tok1 = *tok2 = *tok3 = '\0';
@@ -615,7 +615,7 @@ static int modify_op(void *driver_data, struct op_info *p, char *buf)
 
 	if (changed) {
 		/* now that md has been modified, update the structure that */
-		/* contains the human readable values (md_opt)              */
+		/* contains the human readable values (md_opt)	      */
 		pxa168_op_machine_to_human(md, md_opt);
 
 		printk(KERN_ERR "new opmode parameters:\n");
@@ -1216,7 +1216,7 @@ static int op_init(struct pxa168_dvfm_info *driver_data, struct info_head *op_ta
 	unsigned int	*pxa168_vcc_core_array;
 	int array_size = ARRAY_SIZE(pxa168_opmode_md_array);
 
-	/* the supported operating modes is stepping dependent        */
+	/* the supported operating modes is stepping dependent	*/
 	/* Vtyp for each operating mode is also stepping dependent.   */
 	/* select the correct operating mode set at runtime here:     */
 	if (cpu_is_pxa168_A0())
@@ -1228,7 +1228,7 @@ static int op_init(struct pxa168_dvfm_info *driver_data, struct info_head *op_ta
 
 	/* create the op_info list, which contains the human readable */
 	/* values (pxa168_md_opt structures) and the dvfm settings    */
-	/* (pxa168_opmode_md structures).                             */
+	/* (pxa168_opmode_md structures).			     */
 	/* start with the fixed operating modes. later, after that,   */
 	/* add some dynamically defined operatimg modes to the list.  */
 
@@ -1238,24 +1238,31 @@ static int op_init(struct pxa168_dvfm_info *driver_data, struct info_head *op_ta
 		/* set the vcc_core field,which is stepping dependent */
 		pxa168_opmode_md_array[i].vcc_core = pxa168_vcc_core_array[i];
 
-		/* Set index of operating point used in idle (lpm)    */
-		if (pxa168_opmode_md_array[i].power_mode != POWER_MODE_ACTIVE)
-			set_idle_op(index, pxa168_opmode_md_array[i].power_mode);
-
 		/* allocate structures and build an op_table entry    */
 		p = kzalloc(sizeof(struct op_info), GFP_KERNEL);
 		if (!p)
 			return -ENOMEM;
 
+		p->index = index;
+
 		md = p->op = kzalloc(sizeof(struct pxa168_md_opt), GFP_KERNEL);
-		if (!(p->op))
+		if (!md)
 			return -ENOMEM;
 
-		pxa168_op_machine_to_human(&(pxa168_opmode_md_array[i]), p->op);
 		md->dvfm_settings = &pxa168_opmode_md_array[i];
 		md->index = index;
-		p->index = index++;
+		md->power_mode = pxa168_opmode_md_array[i].power_mode;
+		memcpy(md->name, pxa168_opmode_md_array[i].name, OP_NAME_LEN);
+
+		/* Set index of operating point used in idle (lpm)    */
+		if (md->power_mode != POWER_MODE_ACTIVE)
+			set_idle_op(index, md->power_mode);
+		else
+			pxa168_op_machine_to_human(md->dvfm_settings, md);
+
 		list_add_tail(&(p->list), &(op_table->list));
+
+		++index;
 	}
 
 	/* add dynamically created operating modes to the list.    */
@@ -1280,7 +1287,7 @@ static int op_init(struct pxa168_dvfm_info *driver_data, struct info_head *op_ta
 	pxa168_op_machine_to_human(opmode_md_temp, md);
 
 	/* find out if the current mode is one of the hard coded modes */
-	/* by comparing the human readable structures.                 */
+	/* by comparing the human readable structures.		 */
 	def_op = 0x5a5a;	/* magic number */
 	list_for_each_entry(q, &(op_table->list), list) {
 		smd = (struct pxa168_md_opt *)q->op;
@@ -1301,8 +1308,8 @@ static int op_init(struct pxa168_dvfm_info *driver_data, struct info_head *op_ta
 		kfree(opmode_md_temp);
 	} else {
 		opmode_md_temp->vcc_core = 1155;	/* Vmax for pxa168 */
-		md->dvfm_settings        = opmode_md_temp;
-		md->vcc_core             = opmode_md_temp->vcc_core;
+		md->dvfm_settings	= opmode_md_temp;
+		md->vcc_core	     = opmode_md_temp->vcc_core;
 	}
 	md->power_mode = POWER_MODE_ACTIVE;
 	sprintf(md->name, "BOOT OP");

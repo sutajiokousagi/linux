@@ -226,20 +226,6 @@ void mspm_do_idle(void)
 			if (ret == 0)
 				goto out;
 		}
-		if (lpidle_is_valid(enable_deepidle, msec, &freqs, \
-				IDLE_APPS_SLEEP)) {
-			ret = dvfm_set_op(&freqs, freqs.new,
-					RELATION_STICK);
-			if (ret == 0)
-				goto out;
-		}
-		if (lpidle_is_valid(enable_deepidle, msec, &freqs, \
-				IDLE_APPS_IDLE)) {
-			ret = dvfm_set_op(&freqs, freqs.new,
-					RELATION_STICK);
-			if (ret == 0)
-				goto out;
-		}
 		if (enable_deepidle & IDLE_CORE_EXTIDLE) {
 #ifdef CONFIG_MSPM_PXA168_STATS
 			op = dvfm_get_op(&info);
