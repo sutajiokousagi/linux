@@ -91,6 +91,9 @@ static ssize_t op_show(struct sys_device *sys_dev,
 	if (dvfm_driver->dump) {
 		if (!dvfm_find_op(req_op, &op)) {
 			len = dvfm_driver->dump(dvfm_driver->priv, op, buf);
+			len += sprintf(buf+len,
+				"\nNote: Actual "\
+				"voltage control is platform dependent.\n");
 		}
 	}
 
@@ -129,6 +132,10 @@ static ssize_t ops_show(struct sys_device *sys_dev,
 		}
 	}
 	read_unlock(&dvfm_op_list->lock);
+
+	len += sprintf(buf+len,
+		"Note: Actual "\
+		"voltage control is platform dependent.\n");
 
 	return len;
 }
