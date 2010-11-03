@@ -33,13 +33,10 @@
 #include <mach/pxa168_dvfm.h>
 #include <mach/regs-timers.h>
 
-static int core_intidle_opidx = -1, core_extidle_opidx = -1,\
-	apps_idle_opidx = -1, apps_sleep_opidx = -1, sys_sleep_opidx = -1;
+static int core_extidle_opidx = -1;
+static int sys_sleep_opidx = -1;
 
-#define LOWPOWER_CORE_INTIDLE_THRE 0
 #define LOWPOWER_CORE_EXTIDLE_THRE 0
-#define LOWPOWER_APPS_IDLE_THRE 10
-#define LOWPOWER_APPS_SLEEP_THRE 20
 #define LOWPOWER_SYS_SLEEP_THRE 1500
 #define IDLE_STATS_NUM 1000
 
@@ -103,17 +100,8 @@ static void update_idle_stats(void)
 void set_idle_op(int idx, int mode)
 {
 	switch (mode) {
-	case POWER_MODE_CORE_INTIDLE:
-		core_intidle_opidx = idx;
-		break;
 	case POWER_MODE_CORE_EXTIDLE:
 		core_extidle_opidx = idx;
-		break;
-	case POWER_MODE_APPS_IDLE:
-		apps_idle_opidx = idx;
-		break;
-	case POWER_MODE_APPS_SLEEP:
-		apps_sleep_opidx = idx;
 		break;
 	case POWER_MODE_SYS_SLEEP:
 		sys_sleep_opidx = idx;
@@ -130,26 +118,15 @@ static int lpidle_is_valid(int enable, unsigned int msec,
 	int prev_op;
 	int ret;
 	int threshold = 0;
-	if ((freqs == NULL) || (lp_idle == IDLE_CORE_EXTIDLE && \
-			core_extidle_opidx == -1)
-		|| (lp_idle == IDLE_APPS_IDLE && apps_idle_opidx == -1)
-		|| (lp_idle == IDLE_APPS_SLEEP && apps_sleep_opidx == -1)
+	if ((freqs == NULL)
+		|| (lp_idle == IDLE_CORE_EXTIDLE && core_extidle_opidx == -1)
 		|| (lp_idle == IDLE_SYS_SLEEP && sys_sleep_opidx == -1))
 		return 0;
 
 	if (enable & lp_idle) {
 		switch (lp_idle) {
-		case IDLE_CORE_INTIDLE:
-			threshold = LOWPOWER_CORE_INTIDLE_THRE;
-			break;
 		case IDLE_CORE_EXTIDLE:
 			threshold = LOWPOWER_CORE_EXTIDLE_THRE;
-			break;
-		case IDLE_APPS_IDLE:
-			threshold = LOWPOWER_APPS_IDLE_THRE;
-			break;
-		case IDLE_APPS_SLEEP:
-			threshold = LOWPOWER_APPS_SLEEP_THRE;
 			break;
 		case IDLE_SYS_SLEEP:
 			threshold = LOWPOWER_SYS_SLEEP_THRE;
@@ -172,12 +149,11 @@ static int lpidle_is_valid(int enable, unsigned int msec,
 		if ((ret >= 0) && (op->power_mode == POWER_MODE_ACTIVE)) {
 			prev_op = ret;
 			freqs->old = ret;
-			freqs->new = lp_idle == IDLE_CORE_EXTIDLE \
-				? core_extidle_opidx :
-				lp_idle == IDLE_APPS_IDLE ? apps_idle_opidx :
-				lp_idle == IDLE_APPS_SLEEP ? apps_sleep_opidx :
-				lp_idle == IDLE_SYS_SLEEP ? sys_sleep_opidx :
-				-1;
+			freqs->new =
+				lp_idle == IDLE_CORE_EXTIDLE ?
+					core_extidle_opidx :
+				lp_idle == IDLE_SYS_SLEEP ?
+					sys_sleep_opidx : -1;
 			if (freqs->new < 0)
 				return 0;
 			ret = dvfm_get_opinfo(freqs->new, &info);

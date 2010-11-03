@@ -656,8 +656,6 @@ static ssize_t sleeptime_store(struct kobject *kobj, struct kobj_attribute *attr
 	return len;
 }
 
-#define	pxa168_pm_enter_core_intidle() do {} while (0)
-
 void pxa168_pm_enter_core_extidle(void)
 {
 	uint32_t icu_ap_gbl_irq_msk;
@@ -700,97 +698,6 @@ void pxa168_pm_enter_core_extidle(void)
 	pxa168_pm_swi();
 }
 
-
-
-void pxa168_pm_enter_apps_idle(void)
-{
-	uint32_t icu_ap_gbl_irq_msk;
-
-	/* step 1: set the wakeup source */
-	/* It should be woke up by ICU interrupt */
-
-	/* step 2: set the IDLE bit in the AP idle configuration register*/
-	/*********************************************************************
-	 * set:	DIS_MC_SW_REQ(21), MC_WAKE_EN(20), L2_RESETn(9), and IDLE(1)
-	 * *******************************************************************/
-	if(cpu_is_pxa168_A0()==0)
-		__raw_writel(0x28000000, APMU_PCR );	/* ensure SETALWAYS bits = 1 */
-	else
-		__raw_writel(0x08000000, APMU_PCR );	/* ensure SETALWAYS bits = 1 */
-
-	__raw_writel(0x300202, APMU_IDLE_CFG);
-
-	/* step 3: set the global interrupt mask in the ICU register to mask
-	 * the SYNC IRQ to the core */
-	icu_ap_gbl_irq_msk = __raw_readl(ICU_AP_GBL_IRQ_MSK);
-	icu_ap_gbl_irq_msk |= ICU_AP_GBL_IRQ_MSK_IRQ_MSK | \
-				ICU_AP_GBL_IRQ_MSK_FIQ_MSK;
-	__raw_writel(icu_ap_gbl_irq_msk, ICU_AP_GBL_IRQ_MSK);
-
-	/* step 4: set the AXISDD bit in the AP power control register to 1*/
-
-	/* step 5: set the DDRCORSD and APBSD bits in the MPMU_APCR to 1 */
-
-	/* step 6: set the SLPEN bit in the MPMU_APCR to 1 */
-
-	/* step 7: program the memory controller hardware sleep type */
-	/*********************************************************************
-	 * set:	AXISDD(31), SetAlways(28), DDRCORESD(27),
-	 *	SetAlways(25),
-	 *	SetAlways(14)
-	 *********************************************************************/
-	__raw_writel(0x9a004000, MPMU_APCR);
-
-	pxa168_pm_swi();
-}
-
-void pxa168_pm_enter_apps_sleep(void)
-{
-	uint32_t icu_ap_gbl_irq_msk;
-
-	/* step 1: set the wakeup source */
-	/*********************************************************************
-	 * unmask:	Keypress(21),
-	 * 		RTC_ALARM(17), AP1_TIMER_3(10), AP1_TIMER2(9),
-	 * 		AP1_TIMER1(8), WAKEUP4,3(4,3)
-	 * note:	must mask WAKEUP5(5) and WAKEUP1(1)(for USB port)
-	 *********************************************************************/
-	__raw_writel(0x0220718, MPMU_AWUCRM);
-
-	/* step 2: set the IDLE bit in the AP idle configuration register*/
-	/*********************************************************************
-	 * set:	DIS_MC_SW_REQ(21), MC_WAKE_EN(20), L2_RESETn(9), and IDLE(1)
-	 * *******************************************************************/
-	if(cpu_is_pxa168_A0()==0)
-		__raw_writel(0x28000000, APMU_PCR );	/* ensure SETALWAYS bits = 1 */
-	else
-		__raw_writel(0x08000000, APMU_PCR );	/* ensure SETALWAYS bits = 1 */
-
-	__raw_writel(0x300202, APMU_IDLE_CFG);
-
-	/* step 3: set the global interrupt mask in the ICU register to mask
-	 * the SYNC IRQ to the core */
-	icu_ap_gbl_irq_msk = __raw_readl(ICU_AP_GBL_IRQ_MSK);
-	icu_ap_gbl_irq_msk |= ICU_AP_GBL_IRQ_MSK_IRQ_MSK | \
-			ICU_AP_GBL_IRQ_MSK_FIQ_MSK;
-	__raw_writel(icu_ap_gbl_irq_msk, ICU_AP_GBL_IRQ_MSK);
-
-	/* step 4: set the AXISDD bit in the AP power control register to 1*/
-
-	/* step 5: set the DDRCORSD and APBSD bits in the MPMU_APCR to 1 */
-
-	/* step 6: set the SLPEN bit in the MPMU_APCR to 1 */
-
-	/* step 7: program the memory controller hardware sleep type */
-	/*********************************************************************
-	 * set:	AXISDD(31), SLPEN(29), SetAlways(28), DDRCORESD(27),
-	 *	SetAlways(25), SLPWP0,1,2,5,6,7(23,22,21,17,16,15),
-	 *	SetAlways(14)
-	 *********************************************************************/
-	__raw_writel(0xbae3c000, MPMU_APCR);
-
-	pxa168_pm_swi();
-}
 
 void pxa168_pm_enter_sys_sleep(void)
 {
@@ -933,24 +840,9 @@ void pxa168_pm_enter_lowpower_mode(int state)
 	int op;
 	op = dvfm_get_op(&info);
 	switch (state) {
-	case POWER_MODE_CORE_INTIDLE:
-		mspm_add_event(op, CPU_STATE_RUN);
-		pxa168_pm_enter_core_intidle();
-		mspm_add_event(op, CPU_STATE_IDLE);
-		break;
 	case POWER_MODE_CORE_EXTIDLE:
 		mspm_add_event(op, CPU_STATE_RUN);
 		pxa168_pm_enter_core_extidle();
-		mspm_add_event(op, CPU_STATE_IDLE);
-		break;
-	case POWER_MODE_APPS_IDLE:
-		mspm_add_event(op, CPU_STATE_RUN);
-		pxa168_pm_enter_apps_idle();
-		mspm_add_event(op, CPU_STATE_IDLE);
-		break;
-	case POWER_MODE_APPS_SLEEP:
-		mspm_add_event(op, CPU_STATE_RUN);
-		pxa168_pm_enter_apps_sleep();
 		mspm_add_event(op, CPU_STATE_IDLE);
 		break;
 	case POWER_MODE_SYS_SLEEP:
@@ -1024,18 +916,12 @@ static ssize_t deepidle_show(struct kobject *kobj, struct kobj_attribute *attr,
 {
 	int len = 0;
 
-	if (enable_deepidle & IDLE_CORE_INTIDLE)
-		len += sprintf(buf + len, "core_intidle, ");
 	if (enable_deepidle & IDLE_CORE_EXTIDLE)
 		len += sprintf(buf + len, "core_extidle, ");
-	if (enable_deepidle & IDLE_APPS_IDLE)
-		len += sprintf(buf + len, "apps_idle, ");
-	if (enable_deepidle & IDLE_APPS_SLEEP)
-		len += sprintf(buf + len, "apps_sleep, ");
 	if (enable_deepidle & IDLE_SYS_SLEEP)
 		len += sprintf(buf + len, "sys_sleep\n");
 	len += sprintf(buf + len, "Command: echo [set|unset]\
-		[core_intidle|core_extidle|apps_idle|apps_sleep|sys_sleep] "
+		[core_extidle|sys_sleep] "
 		"> deepidle\n");
 	return len;
 }
@@ -1054,27 +940,15 @@ static ssize_t deepidle_store(struct kobject *kobj, struct kobj_attribute *attr,
 	}
 
 	if (strcmp(token[0], "set") == 0) {
-		if (strcmp(token[1], "core_intidle") == 0)
-			enable_deepidle |= IDLE_CORE_INTIDLE;
-		else if (strcmp(token[1], "core_extidle") == 0)
+		if (strcmp(token[1], "core_extidle") == 0)
 			enable_deepidle |= IDLE_CORE_EXTIDLE;
-		else if (strcmp(token[1], "apps_idle") == 0)
-			enable_deepidle |= IDLE_APPS_IDLE;
-		else if (strcmp(token[1], "apps_sleep") == 0)
-			enable_deepidle |= IDLE_APPS_SLEEP;
 		else if (strcmp(token[1], "sys_sleep") == 0)
 			enable_deepidle |= IDLE_SYS_SLEEP;
 		else
 			error = -EINVAL;
 	} else if (strcmp(token[0], "unset") == 0) {
-		if (strcmp(token[1], "core_intidle") == 0)
-			enable_deepidle &= ~IDLE_CORE_INTIDLE;
-		else if (strcmp(token[1], "core_extidle") == 0)
+		if (strcmp(token[1], "core_extidle") == 0)
 			enable_deepidle &= ~IDLE_CORE_EXTIDLE;
-		else if (strcmp(token[1], "apps_idle") == 0)
-			enable_deepidle &= ~IDLE_APPS_IDLE;
-		else if (strcmp(token[1], "apps_sleep") == 0)
-			enable_deepidle &= ~IDLE_APPS_SLEEP;
 		else if (strcmp(token[1], "sys_sleep") == 0)
 			enable_deepidle &= ~IDLE_SYS_SLEEP;
 		else
@@ -1097,49 +971,6 @@ static struct kobj_attribute sleeptime_attr = {
 	.show	= sleeptime_show,
 	.store	= sleeptime_store,
 };
-
-void pxa168_pm_enter_apps_sleep_test(void)
-{
-	uint32_t icu_ap_gbl_irq_msk;
-
-	/* step 1: set the wakeup source */
-	/*********************************************************************
-	 * unmask:	Keypress(21),
-	 * 		RTC_ALARM(17), AP1_TIMER_3(10), AP1_TIMER2(9),
-	 * 		AP1_TIMER1(8), WAKEUP4,3(4,3)
-	 * note:	must mask WAKEUP5(5) and WAKEUP1(1)(for USB port)
-	 *********************************************************************/
-	__raw_writel(0x0220018, MPMU_AWUCRM);
-
-	/* step 2: set the IDLE bit in the AP idle configuration register*/
-	/*********************************************************************
-	 * set:	DIS_MC_SW_REQ(21), MC_WAKE_EN(20), L2_RESETn(9), and IDLE(1)
-	 * *******************************************************************/
-	__raw_writel(0x300202, APMU_IDLE_CFG);
-
-	/* step 3: set the global interrupt mask in the ICU register to mask
-	 * the SYNC IRQ to the core */
-	icu_ap_gbl_irq_msk = __raw_readl(ICU_AP_GBL_IRQ_MSK);
-	icu_ap_gbl_irq_msk |= ICU_AP_GBL_IRQ_MSK_IRQ_MSK | \
-			ICU_AP_GBL_IRQ_MSK_FIQ_MSK;
-	__raw_writel(icu_ap_gbl_irq_msk, ICU_AP_GBL_IRQ_MSK);
-
-	/* step 4: set the AXISDD bit in the AP power control register to 1*/
-
-	/* step 5: set the DDRCORSD and APBSD bits in the MPMU_APCR to 1 */
-
-	/* step 6: set the SLPEN bit in the MPMU_APCR to 1 */
-
-	/* step 7: program the memory controller hardware sleep type */
-	/*********************************************************************
-	 * set:	AXISDD(31), SLPEN(29), SetAlways(28), DDRCORESD(27),
-	 *	SetAlways(25), SLPWP0,1,2,5,6,7(23,22,21,17,16,15),
-	 *	SetAlways(14)
-	 *********************************************************************/
-	__raw_writel(0xbae3c000, MPMU_APCR);
-
-	pxa168_pm_swi();
-}
 
 void pxa168_pm_enter_sys_sleep_test(void)
 {
@@ -1197,9 +1028,7 @@ void pxa168_pm_enter_lowpower_mode_test(int state)
 
 	unsigned int icu_int_conf[64];
 	int i;
-	if (state == POWER_MODE_CORE_INTIDLE || \
-		state == POWER_MODE_CORE_EXTIDLE || \
-		state == POWER_MODE_APPS_IDLE) {
+	if (state == POWER_MODE_CORE_EXTIDLE) {
 		for (i = 0; i < 64; i++) {
 			icu_int_conf[i] = __raw_readl(ICU_INT_CONF(i));
 			if (IRQ_PXA168_KEYPAD != i)
@@ -1208,17 +1037,8 @@ void pxa168_pm_enter_lowpower_mode_test(int state)
 		}
 	}
 	switch (state) {
-	case POWER_MODE_CORE_INTIDLE:
-		pxa168_pm_enter_core_intidle();
-		break;
 	case POWER_MODE_CORE_EXTIDLE:
 		pxa168_pm_enter_core_extidle();
-		break;
-	case POWER_MODE_APPS_IDLE:
-		pxa168_pm_enter_apps_idle();
-		break;
-	case POWER_MODE_APPS_SLEEP:
-		pxa168_pm_enter_apps_sleep_test();
 		break;
 	case POWER_MODE_SYS_SLEEP:
 		pxa168_pm_enter_sys_sleep_test();
@@ -1227,9 +1047,7 @@ void pxa168_pm_enter_lowpower_mode_test(int state)
 		pxa168_pm_enter_hibernate();
 		break;
 	}
-	if (state == POWER_MODE_CORE_INTIDLE || \
-		state == POWER_MODE_CORE_EXTIDLE || \
-		state == POWER_MODE_APPS_IDLE) {
+	if (state == POWER_MODE_CORE_EXTIDLE) {
 		for (i = 0; i < 64; i++) {
 			if (IRQ_PXA168_KEYPAD != i)
 				__raw_writel(icu_int_conf[i], ICU_INT_CONF(i));
@@ -1251,10 +1069,6 @@ static ssize_t lpidle_store(struct kobject *kobj, struct kobj_attribute *attr,
 	}
 	if (strcmp(token[0], "core_extidle") == 0)
 		pxa168_pm_enter_lowpower_mode_test(POWER_MODE_CORE_EXTIDLE);
-	else if (strcmp(token[0], "apps_idle") == 0)
-		pxa168_pm_enter_lowpower_mode_test(POWER_MODE_APPS_IDLE);
-	else if (strcmp(token[0], "apps_sleep") == 0)
-		pxa168_pm_enter_lowpower_mode_test(POWER_MODE_APPS_SLEEP);
 	else if (strcmp(token[0], "sys_sleep") == 0)
 		pxa168_pm_enter_lowpower_mode_test(POWER_MODE_SYS_SLEEP);
 	else

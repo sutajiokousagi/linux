@@ -74,10 +74,7 @@ static unsigned int pxa168_vcc_core_array_a_step[] = {
 		1100,		/* mode 3.1 */
 		1100,		/* mode 4 */
 		1100,		/* mode 4.1 */
-		1100,		/* core_intidle */
 		1100,		/* core_extidle */
-		1100,		/* apps_idle */
-		1100,		/* apps_sleep */
 		1100,		/* sys_sleep */
 		1100,		/* hibernate */
 };
@@ -91,10 +88,7 @@ static unsigned int pxa168_vcc_core_array_b_step[] = {
 		1000,		/* mode 3.1 */
 		1120,		/* mode 4 */
 		1120,		/* mode 4.1 */
-		1120,		/* core_intidle */
 		1120,		/* core_extidle */
-		1120,		/* apps_idle */
-		1120,		/* apps_sleep */
 		1120,		/* sys_sleep */
 		1120,		/* hibernate */
 };
@@ -237,25 +231,10 @@ static struct pxa168_opmode_md pxa168_opmode_md_array[] = {
 		.pll2_reg1 = 0x900c0664,
 		.vcc_core = 1120,
 	},
-	/* core internal idle */
-	{
-		.power_mode = POWER_MODE_CORE_INTIDLE,
-		.name = "core_intidle",
-	},
 	/* core external idle */
 	{
 		.power_mode = POWER_MODE_CORE_EXTIDLE,
 		.name = "core_extidle",
-	},
-	/* application subsystem idle */
-	{
-		.power_mode = POWER_MODE_APPS_IDLE,
-		.name = "apps_idle",
-	},
-	/* application subsystem sleep */
-	{
-		.power_mode = POWER_MODE_APPS_SLEEP,
-		.name = "apps_sleep",
 	},
 	/* system sleep */
 	{
@@ -476,10 +455,7 @@ static const char *modify_op_help_text =
 	"    vcc_core\n"
 	"    name\n"
 	"    power_mode  - 0 = active\n"
-	"		- 1 = core_intidle\n"
 	"		- 2 = core_extidle\n"
-	"		- 3 = apps_idle\n"
-	"		- 4 = apps_sleep\n"
 	"		- 5 = sys_sleep\n"
 	"		- 6 = hibernate\n"
 	"\n"
@@ -1016,10 +992,7 @@ static int pxa168_set_op(void *driver_data, struct dvfm_freqs *freqs,
 		case POWER_MODE_ACTIVE:
 			do_freq_notify(info, freqs);
 			break;
-		case POWER_MODE_CORE_INTIDLE:
 		case POWER_MODE_CORE_EXTIDLE:
-		case POWER_MODE_APPS_IDLE:
-		case POWER_MODE_APPS_SLEEP:
 		case POWER_MODE_SYS_SLEEP:
 		case POWER_MODE_HIBERNATE:
 			do_lowpower_notify(info, freqs, md->power_mode);
@@ -1317,8 +1290,7 @@ static int op_init(struct pxa168_dvfm_info *driver_data, struct info_head *op_ta
 	p->index  = index++;
 
 	/* Add BOOT OP into op list */
-	list_add_tail(&p->list, &op_table->list);
-
+	list_add_tail(&(p->list), &(op_table->list));
 
 	/* create a place holder for temporary, custom operating modes */
 	q = (struct op_info *)kzalloc(sizeof(struct op_info), GFP_KERNEL);
@@ -1333,19 +1305,6 @@ static int op_init(struct pxa168_dvfm_info *driver_data, struct info_head *op_ta
 	if (!opmode_md_temp)
 		return -ENOMEM;
 
-	/* for now, initialize the custom operating mode data with boot mode */
-	smd = (struct pxa168_md_opt *)q->op;
-	memcpy(smd, md, sizeof(struct pxa168_md_opt));
-	sprintf(smd->name, "CUSTOM OP");
-	memcpy(opmode_md_temp, md->dvfm_settings,
-		sizeof(struct pxa168_opmode_md));
-	smd->dvfm_settings = opmode_md_temp;
-	smd->index = index;
-	q->index = index++;
-
-	/* Add CUSTOM OP into op list */
-	list_add_tail(&q->list, &op_table->list);
-
 	/* BOOT op */
 	if (def_op == 0x5a5a) {
 		cur_op = p->index;
@@ -1357,7 +1316,7 @@ static int op_init(struct pxa168_dvfm_info *driver_data, struct info_head *op_ta
 	pr_debug("%s, def_op:%d, cur_op:%d\n", __func__, def_op, cur_op);
 
 	/* set the operating point number */
-	op_nums = array_size + 2;
+	op_nums = array_size + 1;
 
 	printk("Current Operating Point is %d\n", cur_op);
 	dump_op_list(info, op_table);
@@ -1395,7 +1354,7 @@ static int pxa168_freq_resume(struct platform_device *pdev)
 #define pxa168_freq_resume     NULL
 #endif
 
-static int pxa168_speedgrade()
+static int pxa168_speedgrade(void)
 {
 	unsigned long	speedgrade_bits;
 
@@ -1524,9 +1483,7 @@ static int pxa168_stats_notifier_freq(struct notifier_block *nb,
 			mspm_add_event(freqs->old, CPU_STATE_RUN);
 			break;
 		}
-	} else if (md->power_mode == POWER_MODE_APPS_IDLE ||
-		md->power_mode == POWER_MODE_APPS_SLEEP ||
-		md->power_mode == POWER_MODE_SYS_SLEEP) {
+	} else if (md->power_mode == POWER_MODE_SYS_SLEEP) {
 		switch (val) {
 		case DVFM_FREQ_PRECHANGE:
 			calc_switchtime_start(freqs->old, freqs->new, ticks);
