@@ -45,6 +45,15 @@
 #include <asm/mach-types.h>
 #include "pxa168fb.h"
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+#endif
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void pxa168fb_vid_early_suspend(struct early_suspend *h);
+static void pxa168fb_vid_late_resume(struct early_suspend *h);
+#endif
+
 #ifdef CONFIG_DVFM
 #include <mach/dvfm.h>
 static int dvfm_dev_idx;
@@ -2065,6 +2074,16 @@ static int pxa168fb_probe(struct platform_device *pdev)
 #ifdef CONFIG_DVFM
 	dvfm_register("overlay1", &dvfm_dev_idx);
 #endif
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	/*
+	* Resigter early suspend for android
+	*/
+	fbi->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN;
+	fbi->early_suspend.suspend = pxa168fb_vid_early_suspend;
+	fbi->early_suspend.resume = pxa168fb_vid_late_resume;
+	register_early_suspend(&fbi->early_suspend);
+#endif
 	return 0;
 
 failed:
@@ -2085,9 +2104,8 @@ failed:
 }
 
 #ifdef CONFIG_PM
-static int pxa168fb_vid_suspend(struct platform_device *pdev, pm_message_t mesg)
+static int _pxa168fb_vid_suspend(struct pxa168fb_info *fbi, pm_message_t mesg)
 {
-	struct pxa168fb_info *fbi = platform_get_drvdata(pdev);
 	struct fb_info *fi = fbi->fb_info;
 	unsigned int cntrl0;
 
@@ -2105,7 +2123,6 @@ static int pxa168fb_vid_suspend(struct platform_device *pdev, pm_message_t mesg)
 
 	if (mesg.event & PM_EVENT_SLEEP)
 		fb_set_suspend(fi, 1);
-	pdev->dev.power.power_state = mesg;
 
 #ifdef FB_PM_DEBUG
 	pxa168fb_rw_all_regs(fbi, g_regs, 0);
@@ -2114,15 +2131,14 @@ static int pxa168fb_vid_suspend(struct platform_device *pdev, pm_message_t mesg)
 	return 0;
 }
 
-static int pxa168fb_vid_resume(struct platform_device *pdev)
+static int _pxa168fb_vid_resume(struct pxa168fb_info *fbi)
 {
-	struct pxa168fb_info *fbi = platform_get_drvdata(pdev);
 	struct fb_info *fi = fbi->fb_info;
 	unsigned int temp;
 
 	clk_enable(fbi->clk);
 	if (pxa168fb_set_par(fi) != 0) {
-		printk(KERN_INFO "pxa168fb_vid_resume(): Failed in "
+		printk(KERN_INFO "_pxa168fb_vid_resume(): Failed in "
 				"pxa168fb_set_par().\n");
 		return -1;
 	}
@@ -2154,19 +2170,58 @@ static int pxa168fb_vid_resume(struct platform_device *pdev)
 #endif
 
 	clk_disable(fbi->clk);
-	printk(KERN_INFO "pxa168fb_vid_resumed\n");
+	printk(KERN_INFO "_pxa168fb_vid_resumed\n");
+
+	return 0;
+}
+
+static int pxa168fb_vid_suspend(struct platform_device *pdev, pm_message_t mesg)
+{
+	struct pxa168fb_info *fbi = platform_get_drvdata(pdev);
+
+	_pxa168fb_vid_suspend(fbi, mesg);
+
+	pdev->dev.power.power_state = mesg;
+
+	return 0;
+}
+
+static int pxa168fb_vid_resume(struct platform_device *pdev)
+{
+	struct pxa168fb_info *fbi = platform_get_drvdata(pdev);
+
+	_pxa168fb_vid_resume(fbi);
 
 	return 0;
 }
 #endif
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void pxa168fb_vid_early_suspend(struct early_suspend *h)
+{
+	struct pxa168fb_info *fbi;
+	fbi = container_of(h, struct pxa168fb_info, early_suspend);
+
+	_pxa168fb_vid_suspend(fbi, PMSG_SUSPEND);
+}
+
+static void pxa168fb_vid_late_resume(struct early_suspend *h)
+{
+	struct pxa168fb_info *fbi;
+	fbi = container_of(h, struct pxa168fb_info, early_suspend);
+
+	_pxa168fb_vid_resume(fbi);
+}
+#endif
 
 static struct platform_driver pxa168fb_driver = {
 	.probe		= pxa168fb_probe,
 /*	.remove		= pxa168fb_remove,		*/
 #ifdef CONFIG_PM
+#ifndef CONFIG_HAS_EARLYSUSPEND
 	.suspend	= pxa168fb_vid_suspend,
 	.resume		= pxa168fb_vid_resume,
+#endif
 #endif
 	.driver		= {
 		.name	= "pxa168fb_ovly",
