@@ -385,18 +385,6 @@ void show_ipi_list(struct seq_file *p)
 	seq_putc(p, '\n');
 }
 
-void show_local_irqs(struct seq_file *p)
-{
-	unsigned int cpu;
-
-	seq_printf(p, "LOC: ");
-
-	for_each_present_cpu(cpu)
-		seq_printf(p, "%10u ", irq_stat[cpu].local_timer_irqs);
-
-	seq_putc(p, '\n');
-}
-
 /*
  * Timer (local or broadcast) support
  */
@@ -422,6 +410,18 @@ asmlinkage void __exception_irq_entry do_local_timer(struct pt_regs *regs)
 	}
 
 	set_irq_regs(old_regs);
+}
+
+void show_local_irqs(struct seq_file *p)
+{
+	unsigned int cpu;
+
+	seq_printf(p, "LOC: ");
+
+	for_each_present_cpu(cpu)
+		seq_printf(p, "%10u ", irq_stat[cpu].local_timer_irqs);
+
+	seq_putc(p, '\n');
 }
 #endif
 
