@@ -1204,7 +1204,7 @@ static void __init avengers_lite_init(void)
 
 #ifdef CONFIG_ANDROID_PMEM
 	android_add_pmem("pmem", 0x02000000UL, 1, 0);
-	android_add_pmem("pmem_adsp", 0x00400000UL, 0, 0);
+	android_add_pmem("pmem_adsp", 0x00600000UL, 0, 0);
 #endif
 
 	if (is_android())
