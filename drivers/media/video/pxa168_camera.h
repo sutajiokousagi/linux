@@ -133,6 +133,8 @@
 #define SENSOR_HIGH 1
 #define SENSOR_MAX 2
 
+extern unsigned long va_to_pa(unsigned long user_addr, unsigned int size);
+
 struct ccic_camera;
 
 void ccic_set_clock(unsigned int reg, unsigned int val);
