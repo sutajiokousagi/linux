@@ -666,6 +666,7 @@ static struct i2c_board_info pwri2c_board_info[] =
 };
 
 #if defined(CONFIG_MMC_PXA_SDH)
+/* sd/mmc port is connected to the external socket */
 static struct pfn_cfg mmc1_pfn_cfg[] = {
 	PFN_CFG(PIN_MMC_DAT7, PFN_UNDEF, PFN_UNDEF),
 	PFN_CFG(PIN_MMC_DAT6, PFN_UNDEF, PFN_UNDEF),
@@ -682,6 +683,28 @@ static struct pfn_cfg mmc1_pfn_cfg[] = {
 	PFN_CFG(PIN_MMC_END, PFN_TERM, PFN_TERM),
 };
 
+/* avlite_mmc1_get_cd: return a value indicating card present */
+/* return value:                                              */
+/*    not 0: card present                                     */
+/*        1: card not detected                                */
+/* note:                                                      */
+/*    on the avlite, mfp_86 is a gpio connected to the        */
+/*    external sd/mmc socket's card detect pin.               */
+/*    gpio86 will act as nCD:                                 */
+/*           gpio86 is low when a card is present             */
+/*           gpio86 is high when no card is detected          */
+static int avlite_mmc1_get_cd_n(struct device *dev)
+{
+	unsigned gpio_cd = mfp_to_gpio(MFP_PIN_GPIO86);
+	int rc;
+
+	int status = gpio_get_value(gpio_cd);
+
+	rc =  (status == 0) ? 0 : 1;	/* gpio86 low? return card present */
+
+	return rc;
+}
+
 static struct pxasdh_platform_data avengers_lite_sdh_platform_data = {
 	.detect_delay	= 20,
 	.ocr_mask	= MMC_VDD_32_33 | MMC_VDD_33_34,
@@ -690,8 +713,10 @@ static struct pxasdh_platform_data avengers_lite_sdh_platform_data = {
 	.exit		= pxa_mci_exit,
 	.get_ro		= pxa_mci_ro,
 	.pfn_table	= mmc1_pfn_cfg,
+	.get_cd		= avlite_mmc1_get_cd_n,
 };
 
+/* sd/mmc port is connected to the wifi part: hard-wired, but not always on */
 static struct pfn_cfg mmc4_pfn_cfg[] = {
 	PFN_CFG(PIN_MMC_DAT7, PFN_UNDEF, PFN_UNDEF),
 	PFN_CFG(PIN_MMC_DAT6, PFN_UNDEF, PFN_UNDEF),
@@ -708,10 +733,25 @@ static struct pfn_cfg mmc4_pfn_cfg[] = {
 	PFN_CFG(PIN_MMC_END, PFN_TERM, PFN_TERM),
 };
 
+/* avlite_mmc4_get_cd: return a value indicating card present */
+/* return value:                                              */
+/*    not 0: card present                                     */
+/*        1: card not detected                                */
+/* note:                                                      */
+/*    on the avlite, this sd/mmc port is connected to the     */
+/*    hard-wired wifi chip. for now, this routine will return */
+/*    always present. a future enhancement could be to return */
+/*    present only if power is supplied to the part.          */
+static int avlite_mmc4_get_cd_n(struct device *dev)
+{
+	return 0;	/* 0 means card present */
+}
+
 static struct pxasdh_platform_data avengers_lite_sdh3_platform_data = {
 	.detect_delay	= 20,
 	.ocr_mask	= MMC_VDD_32_33 | MMC_VDD_33_34,
 	.pfn_table	= mmc4_pfn_cfg,
+	.get_cd		= avlite_mmc4_get_cd_n,
 };
 
 static void __init avengers_lite_init_mmc(void)
