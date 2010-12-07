@@ -190,7 +190,7 @@ static APMU_CLK_OPS(sdh2, SDH2, 48000000, &sdh_clk_ops);	/* 48MHz, CLK, AXICLK *
 static APMU_CLK_OPS(sdh3, SDH3, 48000000, &sdh_clk_ops);	/* 48MHz, CLK, AXICLK */
 static APMU_CLK(ccic_rst, CCIC_RST, 0x0, 312000000);
 static APMU_CLK(ccic_gate, CCIC_GATE, 0xfff, 0);
-static APMU_CLK_OPS(cf, CF, 104000000, &cf_clk_ops);
+static APMU_CLK_OPS(cf, CF, 78000000, &cf_clk_ops);
 static APMU_CLK(icr, ICR, 0x3f, 0);
 static APMU_CLK(smc, SMC, 0x5b, 0);
 

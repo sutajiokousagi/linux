@@ -189,9 +189,9 @@ struct clkops sdh_clk_ops = {
 
 static void cf_clk_enable(struct clk *clk)
 {
-	__raw_writel(0xD8, clk->clk_rst);
+	__raw_writel(0x98, clk->clk_rst);
 	udelay(10);
-	__raw_writel(0xDB, clk->clk_rst);
+	__raw_writel(0x9B, clk->clk_rst);
 }
 
 static void cf_clk_disable(struct clk *clk)

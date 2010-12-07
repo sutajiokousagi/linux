@@ -854,7 +854,7 @@ static void pxa168_cfhost_init(struct pxa168_cf_socket *cf)
 
 	/* Program Clock Configuration Register */
 	clk_cfg_reg = readl(cf->base + CFI_CLOCK_CONFIG_OFFSET);
-	clk_cfg_reg = (CFI_CLOCK_CONFIG_MASK & CLOCK_CONFIG_100M) |
+	clk_cfg_reg = (CFI_CLOCK_CONFIG_MASK & CLOCK_CONFIG_75M) |
 		(CFI_CLOCK_RATIO_MASK & (CLOCK_RATIO_1 << 4));
 	writel(clk_cfg_reg, cf->base + CFI_CLOCK_CONFIG_OFFSET);
 
