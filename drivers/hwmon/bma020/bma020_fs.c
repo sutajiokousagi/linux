@@ -43,6 +43,7 @@
 #include <mach/gpio_ec.h>
 #include <mach/mfp-pxa168.h>
 
+
 #include "bma020_fs.h"
 /* #define DEBUG_INFO */
 
@@ -975,49 +976,49 @@ static int bma020_kthread(void *data)
 
 /*
 * To be called before starting to use the device. It makes sure that the
-* device will always be on until a call to bma020_decrease_use(). Not to be
+* device will always be on until a call to bma020_turn_off(). Not to be
 * used from interrupt context.
 */
-static void bma020_increase_use(void)
+static void bma020_turn_on(void)
 {
-	printk(KERN_INFO"%s\n", __FUNCTION__);
-	mutex_lock(&bma_dev.lock);
-	bma_dev.usage++;
-	if (bma_dev.usage == 1) {
-		if (!bma_dev.is_on) {
-			if (!bma020_poweron()) {
-				/* 0 for success power on */
-				bma_dev.is_on = 1;
-				bma_dev.kthread = kthread_run(bma020_kthread,
-				NULL, "bma020");
-			} else {
-				bma_dev.is_on = 0;
-				bma_dev.usage = 0;
-			}
+
+mutex_lock(&bma_dev.lock);
+
+	if (!bma_dev.is_on) {
+		if (!bma020_poweron())	{
+			/* 0 for success power on */
+			printk(KERN_INFO "%s\n", __func__);
+			bma_dev.is_on = 1;
+			bma_dev.usage = 1;
+			bma_dev.kthread = kthread_run(bma020_kthread,
+			NULL, "bma020");
+		} else {
+			bma_dev.is_on = 0;
+			bma_dev.usage = 0;
 		}
-	}
-	mutex_unlock(&bma_dev.lock);
+	} else
+		printk(KERN_INFO"bma020 is already on\n");
+mutex_unlock(&bma_dev.lock);
 }
 
 /*
 * To be called whenever a usage of the device is stopped.
 * It will make sure to turn off the device when there is not usage.
 */
-static void bma020_decrease_use(void)
+static void bma020_turn_off(void)
 {
-	printk(KERN_INFO"%s\n", __FUNCTION__);
-	mutex_lock(&bma_dev.lock);
+mutex_lock(&bma_dev.lock);
 	if (bma_dev.usage == 0) {
+		printk(KERN_INFO"bma020 is already off\n");
 		mutex_unlock(&bma_dev.lock);
 		return;
 	}
-	bma_dev.usage--;
-	if (bma_dev.usage == 0) {
-		bma020_poweroff();
-		bma_dev.is_on = 0;
-		kthread_stop(bma_dev.kthread);
-	}
-	mutex_unlock(&bma_dev.lock);
+	printk(KERN_INFO"%s\n", __func__);
+	bma020_poweroff();
+	bma_dev.is_on = 0;
+	bma_dev.usage = 0;
+	kthread_stop(bma_dev.kthread);
+mutex_unlock(&bma_dev.lock);
 }
 
 static inline void bma020_calibrate_joystick(void)
@@ -1212,9 +1213,9 @@ static ssize_t bma020_status_set(struct device *dev,
 		const char *buf, size_t count)
 {
 	if (strcmp(buf, "on\n") == 0)
-		bma020_increase_use();
+		bma020_turn_on();
 	else if (strcmp(buf, "off\n") == 0)
-		bma020_decrease_use();
+		bma020_turn_off();
 	else
 		printk(KERN_INFO"unrecognized, using on/off\n");
 	return count;
@@ -1374,7 +1375,7 @@ static int __devinit bma020_probe(struct i2c_client *client,
 	bma_dev.range = BMA020_RANGE_2G;
 	bma_dev.bandwidth = BMA020_BW_25HZ;
 	bma_dev.sample_interval = 1000;/* ms */
-	mutex_init(&bma_dev.lock);/* be called before bma020_increase_use() */
+	mutex_init(&bma_dev.lock);/* be called before bma020_turn_on() */
 
 	/* make sure it's a bma020 sensor */
 	for (retry = 0; retry < 30; retry++) {
