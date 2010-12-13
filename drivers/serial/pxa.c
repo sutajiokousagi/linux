@@ -957,6 +957,7 @@ serial_pxa_set_termios(struct uart_port *port, struct ktermios *termios,
 	unsigned char cval, fcr = 0;
 	unsigned long flags;
 	unsigned int baud, quot, baud_max;
+	volatile unsigned char pace = 0;
 
 	switch (termios->c_cflag & CSIZE) {
 	case CS5:
@@ -1081,6 +1082,7 @@ serial_pxa_set_termios(struct uart_port *port, struct ktermios *termios,
 
 	serial_out(up, UART_LCR, cval | UART_LCR_DLAB);	/* set DLAB */
 	serial_out(up, UART_DLL, quot & 0xff);		/* LS of divisor */
+	pace |= serial_in(up, UART_DLL);
 	serial_out(up, UART_DLM, quot >> 8);		/* MS of divisor */
 	serial_out(up, UART_LCR, cval);			/* reset DLAB */
 	up->lcr = cval;					/* Save LCR */
