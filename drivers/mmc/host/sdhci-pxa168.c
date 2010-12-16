@@ -478,8 +478,6 @@ static int pxa_sdh_probe(struct platform_device *pdev)
 #warning SET BROKEN_TIMEOUT_VAL
 	chip->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
 #endif
-	chip->quirks |= SDHCI_QUIRK_BROKEN_ADMA;
-
 	r = request_mem_region(r->start, SZ_256, DRIVER_NAME);
 	DBG("request_mem_region = %p\n", r);
 	if (!r) {
