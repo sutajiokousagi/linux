@@ -1346,7 +1346,7 @@ static int __init pxa168fb_probe(struct platform_device *pdev)
 	pxa168fb_power(fbi, mi, 1);
 
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#ifdef CONFIG_HAS_EARLYSUSPEND_0
 	/*
 	 * Resigter early suspend for android
 	 */
