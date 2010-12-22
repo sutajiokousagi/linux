@@ -2169,7 +2169,6 @@ static int _pxa168fb_vid_resume(struct pxa168fb_info *fbi)
 	}
 #endif
 
-	clk_disable(fbi->clk);
 	printk(KERN_INFO "_pxa168fb_vid_resumed\n");
 
 	return 0;
