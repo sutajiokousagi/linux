@@ -251,9 +251,6 @@ ENTRY(mohawk_coherent_user_range)
 ENTRY(mohawk_flush_kern_dcache_area)
 	add	r1, r0, r1
 1:	mcr	p15, 0, r0, c7, c14, 1		@ clean+invalidate D entry
-#if defined(CONFIG_CPU_L2_CACHE)
-	mcr	p15, 1, r0, c7, c15, 1		@ L2C clean + invalidate entry
-#endif
 	add	r0, r0, #CACHE_DLINESIZE
 	cmp	r0, r1
 	blo	1b
