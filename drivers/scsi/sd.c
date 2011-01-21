@@ -2439,6 +2439,20 @@ static int sd_resume(struct device *dev)
 {
 	struct scsi_disk *sdkp = scsi_disk_get_from_dev(dev);
 	int ret = 0;
+	struct scsi_sense_hdr sshdr;
+
+	/* some media require a test_unit_ready command before accepting */
+	/* READ_xx and WRITE_xx requests. This is especially true of USB */
+	/* mass storage devices. For devices that do not needs this cmd, */
+	/* it is harmless.                                               */
+	ret = scsi_test_unit_ready(sdkp->device, SD_TIMEOUT, SD_MAX_RETRIES,
+		&sshdr);
+	if (ret) {
+		printk(KERN_ERR "%s: Warning: error %08x returned from "
+		"scsi_test_unit_ready. "
+		"Device *may* not work.\n", __func__, ret);
+		goto done;
+	}
 
 	if (!sdkp->device->manage_start_stop)
 		goto done;
