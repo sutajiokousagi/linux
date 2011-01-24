@@ -606,6 +606,12 @@ hibernate_sram_start:
 	@mov	r7, #1
 	@str	r7, [r6, #0x00b4]
 
+	@ set ddr drive strength to 0
+	mov	r7, #0
+	str	r7, [r4, #0x01D0]
+	str	r7, [r4, #0x01E0]
+	str	r7, [r4, #0x01F0]
+
 	ldr	r11, =MACH_TYPE_ASPENITE
 	cmp	r10, r11
 	beq	aspenite_power_down
