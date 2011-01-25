@@ -36,6 +36,7 @@ struct device *dev;
 #define BUFFER_AVAIL_TIMEOUT (2*HZ/10)
 #define TRANSFER_DONE_TIMEOUT (2*HZ/10)
 #define CARD_READY_TIMEOUT (2*HZ/10)
+#define CONFIG_CF_LOCK 1
 
 #define GPIO_CF_nCD1 32
 #define GPIO_CF_nCD2 33
@@ -50,13 +51,13 @@ struct pxa168_cf_socket {
 	unsigned long		phys_baseaddr;
 	void __iomem		*base;
 	u_int			irq;
+	spinlock_t		lock;
 };
 
 static void __iomem *cf_base;
+static spinlock_t *cf_lock;
 static struct completion transfer_done, buffer_avail, card_ready;
 volatile int transf_done, buf_avail, card_rdy;
-
-#define	SZ_2K	(2 * SZ_1K)
 
 static inline int is_card_ready(void __iomem *cf_base);
 
@@ -271,6 +272,9 @@ void pxa168_cf_mem_writeb(u8 attr_mem_transfer, u8 val, u32 addr)
 {
 	u32 tmp, trans_ctrl, intr_en, ret, retries=5;
 
+#ifdef CONFIG_CF_LOCK
+	spin_lock_bh(cf_lock);
+#endif
 	attr_mem_transfer = attr_mem_transfer?1:0;
 	if (!in_softirq())
 		INIT_COMPLETION(transfer_done);
@@ -319,6 +323,9 @@ retry_again:
 		intr_en = intr_en | CF_INTEN_TRANS_DONE_IRQ | 
 			CF_INTEN_BUFF_AVAL_IRQ;
 	}
+#ifdef CONFIG_CF_LOCK
+	spin_unlock_bh(cf_lock);
+#endif
 	dev_dbg(dev,"%s: After Transfer: intr_en = 0x%x addr = 0x%x \
 		trans_ctrl_reg=0x%x\n",__func__, 
 		readl(cf_base + CF_INTEN_OFFSET), addr, 
@@ -329,6 +336,9 @@ u8 pxa168_cf_mem_readb(u8 attr_mem_transfer, u32 addr)
 {
 	u32 val, tmp, trans_ctrl, intr_en, ret, retries=5;
 
+#ifdef CONFIG_CF_LOCK
+	spin_lock_bh(cf_lock);
+#endif
 	attr_mem_transfer = attr_mem_transfer?1:0;
 	if (!in_softirq()) {
 		INIT_COMPLETION(transfer_done);
@@ -394,6 +404,9 @@ retry_again:
 		intr_en = intr_en | CF_INTEN_TRANS_DONE_IRQ | 
 			CF_INTEN_BUFF_AVAL_IRQ;
 	}
+#ifdef CONFIG_CF_LOCK
+	spin_unlock_bh(cf_lock);
+#endif
 	return (u8) val & 0xFF;
 }
 
@@ -401,6 +414,9 @@ void pxa168_cf_mem_writew(u8 attr_mem_transfer, u16 val, u32 addr)
 {
 	u32 tmp, trans_ctrl, intr_en, ret, retries=5;
 
+#ifdef CONFIG_CF_LOCK
+	spin_lock_bh(cf_lock);
+#endif
 	attr_mem_transfer = attr_mem_transfer?1:0;
 	if (!in_softirq())
 		INIT_COMPLETION(transfer_done);
@@ -454,12 +470,18 @@ retry_again:
 		intr_en = intr_en | CF_INTEN_TRANS_DONE_IRQ | 
 			CF_INTEN_BUFF_AVAL_IRQ;
 	}
+#ifdef CONFIG_CF_LOCK
+	spin_unlock_bh(cf_lock);
+#endif
 }
 
 u32 pxa168_cf_mem_readw(u8 attr_mem_transfer, u32 addr)
 {
 	u32 val, tmp, trans_ctrl, intr_en, ret, retries=5;
 
+#ifdef CONFIG_CF_LOCK
+	spin_lock_bh(cf_lock);
+#endif
 	attr_mem_transfer = attr_mem_transfer?1:0;
 	if (!in_softirq()) {
 		INIT_COMPLETION(transfer_done);
@@ -528,6 +550,9 @@ retry_again:
 		intr_en = intr_en | CF_INTEN_TRANS_DONE_IRQ | 
 			CF_INTEN_BUFF_AVAL_IRQ;
 	}
+#ifdef CONFIG_CF_LOCK
+	spin_unlock_bh(cf_lock);
+#endif
 	return val & 0xFFFF;
 }
 
@@ -543,6 +568,9 @@ void pxa168_cf_mem_write(u8 attr_mem_transfer, u8* buf, u32 addr, u32 words)
 		return;
 	}
 	dev_dbg(dev,"%s: addr=0x%x words=0x%x\n",__func__, addr, words);
+#ifdef CONFIG_CF_LOCK
+	spin_lock_bh(cf_lock);
+#endif
 	attr_mem_transfer = attr_mem_transfer?1:0;
 	if (in_softirq()) {
 		dev_dbg(dev,"%s: In SoftIRQ Context\n",__func__);
@@ -624,6 +652,9 @@ void pxa168_cf_mem_write(u8 attr_mem_transfer, u8* buf, u32 addr, u32 words)
 		intr_en = intr_en | CF_INTEN_TRANS_DONE_IRQ | 
 			CF_INTEN_BUFF_AVAL_IRQ;
 	}
+#ifdef CONFIG_CF_LOCK
+	spin_unlock_bh(cf_lock);
+#endif
 }
 
 void pxa168_cf_mem_read(u8 attr_mem_transfer, u8* buf, u32 addr, u32 words)
@@ -638,6 +669,9 @@ void pxa168_cf_mem_read(u8 attr_mem_transfer, u8* buf, u32 addr, u32 words)
 		return;
 	}
 	dev_dbg(dev,"%s: addr=0x%x words=0x%x\n",__func__, addr, words);
+#ifdef CONFIG_CF_LOCK
+	spin_lock_bh(cf_lock);
+#endif
 	attr_mem_transfer = attr_mem_transfer?1:0;
 	if (in_softirq()) {
 		dev_dbg(dev,"%s: In SoftIRQ Context\n",__func__);
@@ -724,6 +758,9 @@ void pxa168_cf_mem_read(u8 attr_mem_transfer, u8* buf, u32 addr, u32 words)
 		intr_en = intr_en | CF_INTEN_TRANS_DONE_IRQ | 
 				CF_INTEN_BUFF_AVAL_IRQ;
 	}
+#ifdef CONFIG_CF_LOCK
+	spin_unlock_bh(cf_lock);
+#endif
 }
 
 void pxa168_cf_enable_trueide_mode(void)
@@ -969,7 +1006,9 @@ static int __init pxa168_cf_probe(struct platform_device *pdev)
 				| SS_CAP_MEM_ALIGN;
 	cf->socket.map_size = SZ_1K;
 	cf->socket.io[0].res = res;
-	
+	spin_lock_init(&cf->lock);
+	cf_lock = &cf->lock;
+
 	dev_dbg(dev,"%s:Registering PCMCIA Socket\n",__func__);
 	status = pcmcia_register_socket(&cf->socket);
 	if (status < 0)
