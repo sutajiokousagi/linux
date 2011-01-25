@@ -555,7 +555,7 @@ void pxa168_cf_mem_write(u8 attr_mem_transfer, u8* buf, u32 addr, u32 words)
 	{
 		if (!in_softirq())
 			INIT_COMPLETION(transfer_done);
-		len = (buf_len>=0x20000)?0x1FFFF:buf_len;
+		len = (buf_len > 0x20000) ? 0x20000 : buf_len;
 		trans_ctrl = ((CF_TCNTR_MEM_TRANS_START) |
 			      (CF_TCNTR_TRANS_DIR_WRITE) |
 		      (CF_TCNTR_COMMON_ATTR_MEM &(attr_mem_transfer<<26)) |
@@ -652,7 +652,7 @@ void pxa168_cf_mem_read(u8 attr_mem_transfer, u8* buf, u32 addr, u32 words)
 	{
 		if (!in_softirq())
 			INIT_COMPLETION(transfer_done);
-		len = (buf_len>=0x20000)?0x1FFFF:buf_len;
+		len = (buf_len > 0x20000) ? 0x20000 : buf_len;
 		trans_ctrl = ((CF_TCNTR_MEM_TRANS_START) |
 		      (CF_TCNTR_COMMON_ATTR_MEM &(attr_mem_transfer<<26)) |
 			      (CF_TCNTR_TRANS_SIZE_WORD) |
