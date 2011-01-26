@@ -773,9 +773,35 @@ static int check_surface(struct fb_info *fi,
 
 static void pxa168fb_clear_framebuffer(struct fb_info *fi)
 {
-        struct pxa168fb_info *fbi = fi->par;
+	struct pxa168fb_info *fbi = fi->par;
+	struct fb_var_screeninfo *var = &fi->var;
+	u32 *i;
+	u32 f_size;
 
-        memset(fbi->fb_start, 0, fbi->fb_size);
+	if (fbi->pix_fmt < 10) { /* RGB space clears with all all zeros */
+		memset(fbi->fb_start, 0, fbi->fb_size);
+		return;
+	}
+	if (fbi->pix_fmt < 12) {
+		/* YUV 422 Packed */
+		f_size = (var->xres * var->yres)/2;
+		for (i = (u32 *)fbi->fb_start; i <
+			(u32 *)((u8 *)fbi->fb_start + f_size); i++)
+			*i = 0x10801080;
+		return;
+	}
+	if (fbi->pix_fmt < 14) {
+		f_size = (var->xres * var->yres);
+		memset(fbi->fb_start, 16, f_size/2);
+		memset(fbi->fb_start + f_size/2, 128, f_size/2);
+		return;
+	}
+
+	if (fbi->pix_fmt < 20) {
+		f_size = (var->xres * var->yres);
+		memset(fbi->fb_start, 16, f_size);
+		memset(fbi->fb_start + f_size, 128, f_size/2);
+	}
 }
 
 
