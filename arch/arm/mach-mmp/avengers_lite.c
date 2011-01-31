@@ -48,6 +48,7 @@
 #include <linux/sd8x_rfkill.h>
 #endif
 #include <plat/pfn_cfg.h>
+#include <linux/mmc/sdhci.h>
 
 static unsigned int AVLITE_BOARDID = 0;
 unsigned int board_is_1p9(void)
@@ -750,6 +751,7 @@ static int avlite_mmc4_get_cd_n(struct device *dev)
 static struct pxasdh_platform_data avengers_lite_sdh3_platform_data = {
 	.detect_delay	= 20,
 	.ocr_mask	= MMC_VDD_32_33 | MMC_VDD_33_34,
+	.quirks         = SDHCI_QUIRK_BROKEN_ADMA,
 	.pfn_table	= mmc4_pfn_cfg,
 	.get_cd		= avlite_mmc4_get_cd_n,
 };
