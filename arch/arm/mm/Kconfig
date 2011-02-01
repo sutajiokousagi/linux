@@ -371,6 +371,7 @@ config CPU_L2_CACHE
 	bool "Enable Mohawk L2 Cache"
 	depends on CPU_MOHAWK && !CPU_ARM926T
 	default y
+	select OUTER_CACHE
 
 config ENABLE_COREIDLE
 	bool "Enables core idle and low power mode, currently via WFI"
