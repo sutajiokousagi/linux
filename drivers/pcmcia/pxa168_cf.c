@@ -1064,7 +1064,7 @@ static int __exit pxa168_cf_remove(struct platform_device *pdev)
 #ifdef CONFIG_PM
 static int pxa168_cf_suspend(struct platform_device *pdev, pm_message_t mesg)
 {
-	return pcmcia_socket_dev_suspend(&pdev->dev, mesg);
+	return 0;
 }
 
 static int pxa168_cf_resume(struct platform_device *pdev)
@@ -1077,7 +1077,7 @@ static int pxa168_cf_resume(struct platform_device *pdev)
 	init_completion(&buffer_avail);
 	init_completion(&card_ready);
 	transf_done = buf_avail = card_rdy = 1;
-	return pcmcia_socket_dev_resume(&pdev->dev);
+	return 0;
 }
 #else
 #define pxa168_cf_suspend  NULL
