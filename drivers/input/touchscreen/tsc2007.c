@@ -45,7 +45,6 @@ extern int ts_linear_scale(int *x, int *y, int swap_xy);
 
 /* delay time for compute x, y, computed as us */
 
-#define DEBUG
 #ifdef DEBUG
 #define TS_DEBUG(fmt,args...) printk(KERN_DEBUG fmt, ##args )
 #else
