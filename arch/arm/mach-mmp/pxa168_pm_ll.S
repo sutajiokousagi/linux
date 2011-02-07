@@ -649,11 +649,24 @@ aspenite_power_down:
 avenger_power_down:
         ldr             r8, =0xfe019004
         ldr             r0, [r8, #0xc]
-        orr             r0, r0, #0x200000
+        orr             r0, r0, #0x280000
         str             r0 , [r8, #0xc]
 
+/*****************************************
+set GPIO51 high i.e. SD_GNT (active low),
+not to shutdown indication to Embedded Controller
+******************************************/
+
+	ldr             r8, =0xfe019004
+        mov             r0, #0x80000
+        str             r0 , [r8, #0x18]
+
+/*****************************************
+set GPIO53 low i.e. STR_GNT (active low),
+hibernation grant to Embedded Controller
+******************************************/
+
         ldr             r8, =0xfe019004
-        ldr             r0, [r8, #0x24]
         mov             r0, #0x200000
         str             r0 , [r8, #0x24]
 
