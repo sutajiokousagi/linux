@@ -686,7 +686,7 @@ static int irq_thread(void *data)
 	struct sched_param param = { .sched_priority = MAX_USER_RT_PRIO/2, };
 	struct irqaction *action = data;
 	struct irq_desc *desc = irq_to_desc(action->irq);
-	int wake, oneshot = desc->status & IRQ_ONESHOT;
+	int wake, oneshot = desc->istate & IRQS_ONESHOT;
 
 	sched_setscheduler(current, SCHED_FIFO, &param);
 	current->irqaction = action;
@@ -886,12 +886,12 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 			desc->status |= IRQ_PER_CPU;
 #endif
 
-		desc->status &= ~(IRQ_WAITING | IRQ_ONESHOT);
+		desc->status &= ~IRQ_WAITING;
 		desc->istate &= ~(IRQS_AUTODETECT | IRQS_SPURIOUS_DISABLED | \
-				  IRQS_INPROGRESS);
+				  IRQS_INPROGRESS | IRQS_ONESHOT);
 
 		if (new->flags & IRQF_ONESHOT)
-			desc->status |= IRQ_ONESHOT;
+			desc->istate |= IRQS_ONESHOT;
 
 		if (!(desc->status & IRQ_NOAUTOEN))
 			irq_startup(desc);
