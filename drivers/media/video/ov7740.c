@@ -2619,13 +2619,15 @@ static int ov7740_s_ctrl(struct i2c_client *client, struct v4l2_control *ctrl)
 
 #ifdef CONFIG_VIDEO_ADV_DEBUG
 //get ov register value directly, for debug usage
-static int ov7740_g_register(struct i2c_client *client, struct v4l2_register * reg)
+static int ov7740_g_register(struct i2c_client *client,
+						struct v4l2_dbg_register *reg)
 {
 	return ov7740_read(client, (unsigned char)reg->reg, (unsigned char *)&(reg->val));
 }
 
 //set ov register value directly, for debug usage
-static int ov7740_s_register(struct i2c_client *client, struct v4l2_register * reg)
+static int ov7740_s_register(struct i2c_client *client,
+						struct v4l2_dbg_register *reg)
 {
 	return ov7740_write(client, (unsigned char)reg->reg, (unsigned char)reg->val);
 }
