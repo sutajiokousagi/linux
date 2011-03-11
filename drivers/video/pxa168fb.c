@@ -35,7 +35,6 @@
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
-#include <linux/wakelock.h>
 #endif
 
 #include <mach/io.h>
@@ -102,7 +101,6 @@ static int _pxa168fb_suspend(struct pxa168fb_info *fbi, pm_message_t mesg);
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void pxa168fb_early_suspend(struct early_suspend *h);
 static void pxa168fb_late_resume(struct early_suspend *h);
-static struct wake_lock lcd_off_wakeup;
 #endif
 
 
@@ -1249,13 +1247,6 @@ static int __init pxa168fb_probe(struct platform_device *pdev)
 		goto failed;
 	}
 
-	/* Initialize wakelock
-	 *
-	 */
-	 #ifdef CONFIG_HAS_EARLYSUSPEND
-	 wake_lock_init(&lcd_off_wakeup, WAKE_LOCK_SUSPEND, "pxa168_fb");
-	 #endif
-
 	/*
 	 * Allocate framebuffer memory.
 	 */
@@ -1421,9 +1412,7 @@ static int _pxa168fb_suspend(struct pxa168fb_info *fbi, pm_message_t mesg)
 	fb_set_suspend(info, 1);
 
 	clk_disable(fbi->clk);
-	#ifdef CONFIG_HAS_EARLYSUSPEND
-	wake_lock_timeout(&lcd_off_wakeup, HZ * 120);
-	#endif
+
 	return 0;
 }
 
