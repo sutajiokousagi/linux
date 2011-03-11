@@ -574,7 +574,6 @@ __mohawk_setup:
 	ldr	r6, =MOHAWK_CPU_CONF
 	ldr	r5, [r6]
 	orr	r5, r5, #(1<<5)			@ disable write buffer merge
-	orr	r5, r5, #(1<<22)		@ cpu power taken
 	str	r5, [r6]
 
 	mov	pc, lr
