@@ -2153,6 +2153,7 @@ static int _pxa168fb_vid_suspend(struct pxa168fb_info *fbi, pm_message_t mesg)
 #ifdef FB_PM_DEBUG
 	pxa168fb_rw_all_regs(fbi, g_regs, 0);
 #endif
+	clk_disable(fbi->clk);
 
 	return 0;
 }
@@ -2162,7 +2163,6 @@ static int _pxa168fb_vid_resume(struct pxa168fb_info *fbi)
 	struct fb_info *fi = fbi->fb_info;
 	unsigned int temp;
 
-	clk_enable(fbi->clk);
 	if (pxa168fb_set_par(fi) != 0) {
 		printk(KERN_INFO "_pxa168fb_vid_resume(): Failed in "
 				"pxa168fb_set_par().\n");
