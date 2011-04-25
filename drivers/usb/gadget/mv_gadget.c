@@ -100,6 +100,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <linux/usb/gadget.h>
 #include <linux/usb/otg.h>
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+#include <linux/wakelock.h>
+#endif
+
 #include "mv/mvUsbDevApi.h"
 #include "mv/mvUsbCh9.h"
 #include <plat/pxausb_comp.h>
@@ -164,6 +169,13 @@ int IRQ_USB_CTRL[1];
 int connected;
 static int conn_check = 1;
 int rely_on_vbus;
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void mv_usb_gadget_early_suspend(struct early_suspend *h);
+static void mv_usb_gadget_late_resume(struct early_suspend *h);
+static struct wake_lock usb_conn_wakelock;
+static struct early_suspend early_suspend;
+#endif
 
 #if defined(CONFIG_PXA3xx_DVFM)
 static struct dvfm_lock dvfm_lock = {
@@ -2897,6 +2909,19 @@ static int mv_usb_gadget_resume(struct platform_device *_dev)
 	return 0;
 }
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void mv_usb_gadget_early_suspend(struct early_suspend *h)
+{
+	if (conn_check && is_cable_attached())
+		wake_lock(&usb_conn_wakelock);
+}
+
+static void mv_usb_gadget_late_resume(struct early_suspend *h)
+{
+	wake_unlock(&usb_conn_wakelock);
+}
+#endif
+
 static struct platform_driver udc_driver = {
 	.shutdown	= mv_usb_gadget_shutdown,
 	.remove		= __exit_p(mv_usb_gadget_remove),
@@ -2917,6 +2942,14 @@ static int __init init (void)
 {
     mvOsPrintf("%s: version %s loaded\n", driver_name, DRIVER_VERSION);
     usb_start_resource_dump();
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	wake_lock_init(&usb_conn_wakelock, WAKE_LOCK_SUSPEND, "mv_usb");
+
+	early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN;
+	early_suspend.suspend = mv_usb_gadget_early_suspend;
+	early_suspend.resume = mv_usb_gadget_late_resume;
+	register_early_suspend(&early_suspend);
+#endif
     return platform_driver_probe(&udc_driver, mv_usb_gadget_probe);
 }
 module_init (init);
@@ -2924,6 +2957,9 @@ module_init (init);
 static void __exit cleanup (void)
 {
     mvOsPrintf("%s: version %s unloaded\n", driver_name, DRIVER_VERSION);
+#ifdef CONFIG_HAS_EARLYSUSPEND
+    wake_lock_destroy(&usb_conn_wakelock);
+#endif
     platform_driver_unregister(&udc_driver);
 }
 module_exit (cleanup);
