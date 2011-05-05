@@ -162,7 +162,6 @@ struct regval_list {
 // Date: 4/28/2009
 static struct regval_list OV7740_CIF_YUYV_30fps[] = {
 	//reg addr, val
-	{0x12, 0x80},
 	{0x13, 0x00},
 
 	{0x55, 0x40},//div
@@ -301,8 +300,6 @@ static struct regval_list OV7740_CIF_YUYV_30fps[] = {
 	{0xEC, 0x00}, //00/80 for manual/auto
 	{0x7c, 0x0c},
 
-	{0xda, 0x07},	/* Enable config brigntness, contrast, hue and satuation */
-
 	{0xFF, 0xFF},	/* END MARKER */
 };
 
@@ -310,7 +307,6 @@ static struct regval_list OV7740_CIF_YUYV_30fps[] = {
 // 30fps at 24MHz input clock, 16x gain ceiling
 // Date: 4/28/2009
 static struct regval_list OV7740_QCIF_YCbCr_30fps[] = {
-	{0x12, 0x80},
 	{0x13, 0x00},
 
 	{0x55, 0x40},//div
@@ -444,8 +440,6 @@ static struct regval_list OV7740_QCIF_YCbCr_30fps[] = {
 	{0xEC, 0x00},//00/80 for manual/auto 50_60Hz
 	{0x7c, 0x0c},
 
-	{0xda, 0x07},	/* Enable config brigntness, contrast, hue and satuation */
-
 	{0xFF, 0xFF},	/* END MARKER */
 };
 
@@ -453,7 +447,6 @@ static struct regval_list OV7740_QCIF_YCbCr_30fps[] = {
 // 30fps at 24MHz input clock, 16x gain ceiling
 // Date: 4/28/2009
 static struct regval_list OV7740_QQVGA_YCbCr_30fps[] = {
-	{0x12, 0x80},
 	{0x13, 0x00},
 
 	{0x55, 0x40},//div
@@ -587,8 +580,6 @@ static struct regval_list OV7740_QQVGA_YCbCr_30fps[] = {
 	{0xEC, 0x00},//00/80 for manual/auto 50_60Hz
 	{0x7c, 0x0c},
 
-	{0xda, 0x07},	/* Enable config brigntness, contrast, hue and satuation */
-
 	{0xFF, 0xFF},	/* END MARKER */
 };
 
@@ -596,7 +587,6 @@ static struct regval_list OV7740_QQVGA_YCbCr_30fps[] = {
 // 30fps at 24MHz input clock, 16x gain ceiling
 // Date: 4/28/2009
 static struct regval_list OV7740_QVGA_YCbCr_30fps[] = {
-	{0x12, 0x80},
 	{0x13, 0x00},
 
 	{0x55, 0x40},//div
@@ -732,8 +722,6 @@ static struct regval_list OV7740_QVGA_YCbCr_30fps[] = {
 	{0xEC, 0x00},//00/80 for manual/auto
 	{0x7c, 0x0c},
 
-	{0xda, 0x07},	/* Enable config brigntness, contrast, hue and satuation */
-
 	{0xFF, 0xFF},	/* END MARKER */
 };
 
@@ -741,7 +729,6 @@ static struct regval_list OV7740_QVGA_YCbCr_30fps[] = {
 // 30fps at 24MHz input clock, 16x gain ceiling
 // Date: 4/28/2009
 static struct regval_list OV7740_VGA_BT656_30fps[] = {
-	{0x12, 0x80},
 	{0x13, 0x00},
 
 	{0x55, 0x40},//div
@@ -877,8 +864,6 @@ static struct regval_list OV7740_VGA_BT656_30fps[] = {
 	{0xEC, 0x00},//00/80 for manual/auto
 	{0x7c, 0x0c},
 
-	{0xda, 0x07},	/* Enable config brigntness, contrast, hue and satuation */
-
 	{0xFF, 0xFF},	/* END MARKER */
 };
 
@@ -886,7 +871,6 @@ static struct regval_list OV7740_VGA_BT656_30fps[] = {
 // 30fps at 24MHz input clock, 16x gain ceiling
 // Date: 4/28/2009
 static struct regval_list OV7740_VGA_Raw8_30fps[] = {
-	{0x12, 0x80},
 	{0x13, 0x00},
 
 	{0x55, 0x40},//div
@@ -1022,7 +1006,6 @@ static struct regval_list OV7740_VGA_Raw8_30fps[] = {
 
 	{0x7c, 0x0c},
 
-	{0xda, 0x07},	/* Enable config brigntness, contrast, hue and satuation */
 
 	{0xFF, 0xFF},	/* END MARKER */
 };
@@ -1031,7 +1014,6 @@ static struct regval_list OV7740_VGA_Raw8_30fps[] = {
 // 30fps at 24MHz input clock, 16x gain ceiling
 // Date: 4/28/2009
 static struct regval_list OV7740_VGA_Raw10_30fps[] = {
-	{0x12, 0x80},
 	{0x13, 0x00},
 
 	{0x55, 0x40},//div
@@ -1165,7 +1147,6 @@ static struct regval_list OV7740_VGA_Raw10_30fps[] = {
 	{0xEC, 0x00},//00/80 for manual/auto
 	{0x7c, 0x0c},
 
-	{0xda, 0x07},	/* Enable config brigntness, contrast, hue and satuation */
 
 	{0xFF, 0xFF},	/* END MARKER */
 };
@@ -1174,7 +1155,6 @@ static struct regval_list OV7740_VGA_Raw10_30fps[] = {
 // 30fps at 24MHz input clock, 16x gain ceiling
 // Date: 4/28/2009
 static struct regval_list OV7740_VGA_YCbCr_30fps[] = {
-	{0x12, 0x80},
 	{0x13, 0x00},
 
 	{0x55, 0x40},//div
@@ -1310,8 +1290,6 @@ static struct regval_list OV7740_VGA_YCbCr_30fps[] = {
 	{0xEC, 0x00},//00/80 for manual/auto
 	{0x7c, 0x0c},
 
-	{0xda, 0x07},	/* Enable config brigntness, contrast, hue and satuation */
-
 	{0xFF, 0xFF},	/* END MARKER */
 };
 
@@ -1319,7 +1297,6 @@ static struct regval_list OV7740_VGA_YCbCr_30fps[] = {
 // 60fps at 24MHz input clock, 16x gain ceiling
 // Date: 4/28/2009
 static struct regval_list OV7740_VGA_YCbCr_60fps[] = {
-	{0x12, 0x80},
 	{0x13, 0x00},
 
 	{0x55, 0x40},//div
@@ -1453,14 +1430,11 @@ static struct regval_list OV7740_VGA_YCbCr_60fps[] = {
 	{0xEC, 0x00},//00/80 for manual/auto 50_60Hz
 	{0x7c, 0x0c},
 
-	{0xda, 0x07},	/* Enable config brigntness, contrast, hue and satuation */
-
 	{0xFF, 0xFF},	/* END MARKER */
 };
 
 static struct regval_list OV7740_CIF_YCbCr_30fps[] = {
 	//reg addr, val
-	{0x12, 0x80},
 	{0x13, 0x00},
 
 	{0x55, 0x40},//div
@@ -1597,8 +1571,6 @@ static struct regval_list OV7740_CIF_YCbCr_30fps[] = {
 	{0x7b, 0x1f},
 	{0xEC, 0x00}, //00/80 for manual/auto
 	{0x7c, 0x0c},
-
-	{0xda, 0x07},	/* Enable config brigntness, contrast, hue and satuation */
 
 	{0xFF, 0xFF},	/* END MARKER */
 };
