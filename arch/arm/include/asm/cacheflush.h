@@ -105,11 +105,11 @@
 #endif
 
 #if defined(CONFIG_CPU_MOHAWK)
-# ifdef _CACHE
+//# ifdef _CACHE
 #  define MULTI_CACHE 1
-# else
-#  define _CACHE mohawk
-# endif
+//# else
+//#  define _CACHE mohawk
+//# endif
 #endif
 
 #if defined(CONFIG_CPU_FEROCEON)
