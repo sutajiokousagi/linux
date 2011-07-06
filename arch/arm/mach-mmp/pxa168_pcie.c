@@ -589,6 +589,26 @@ static void __init add_pcie_port(void)
 	pcie_channel_data_init();
 }
 
+
+int pxa168_pcie_probe(struct platform_device *pdev)
+{
+	struct pxa168_pcie_platform_data *pdata =
+		(struct pxa168_pcie_platform_data *)pdev->dev.platform_data;
+
+	if (pdata->init == NULL)
+		return 0;
+
+	if (pdata->init() < 0) {
+		printk(KERN_ERR "pcie: GPIO initialization failed.\n");
+		return 1;
+	}
+
+	add_pcie_port();
+	pci_common_init(&pxa168_pci);
+
+	return 0;
+}
+
 #if defined(CONFIG_PM)
 static int pxa168_pcie_suspend(struct platform_device *pdev, pm_message_t msg)
 {
@@ -598,49 +618,52 @@ static int pxa168_pcie_suspend(struct platform_device *pdev, pm_message_t msg)
 static int pxa168_pcie_resume(struct platform_device *pdev)
 {
 	/* TODO: Get this from platform data instead */
-	if (pxa168_gpio_pcie_init() < 0) {
+/*	if (pxa168_gpio_pcie_init() < 0) {
 		printk(KERN_ERR "pcie: GPIO initialization failed.\n");
 		return 1;
 	}
-
+*/
+	pxa168_pcie_probe(pdev);
 	pxa168_pcie_clk_enable();
 	pxa168_pcie_enable_link();
 	pxa168_pcie_map_irq(NULL, 1, 0);
 
 	return 0;
 }
+#endif /* CONFIG_PM */
 
 static struct platform_driver pxa168_pcie_driver = {
+	.probe		= pxa168_pcie_probe,
+#if defined(CONFIG_PM)
 	.suspend	= pxa168_pcie_suspend,
 	.resume		= pxa168_pcie_resume,
+#endif /* CONFIG_PM */
 	.driver		= {
 		.name	= "pxa168-pcie",
 		.owner	= THIS_MODULE,
 	},
 };
-#endif /* CONFIG_PM */
-
 
 static int __init pxa168_pcie_init(void)
 {
 	int ret;
 
 	/* TODO: Get this from platform data instead */
-	if (pxa168_gpio_pcie_init() < 0) {
+/*	Commented the below line as it was specific to aspenite and creats
+	issue if the same kernel is used for AVLite. Using .probe instead. */
+/*	if (pxa168_gpio_pcie_init() < 0) {
 		printk(KERN_ERR "pcie: GPIO initialization failed.\n");
 		return 1;
 	}
-
-#if defined(CONFIG_PM)
+*/
 	ret = platform_driver_register(&pxa168_pcie_driver);
 	if (ret) {
 		printk(KERN_ERR "pcie: unable to register driver\n");
 		return 1;
 	}
-#endif
 
-	add_pcie_port();
-	pci_common_init(&pxa168_pci);
+/*	add_pcie_port();
+	pci_common_init(&pxa168_pci);*/
 	return 0;
 }
 
