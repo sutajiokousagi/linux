@@ -612,7 +612,7 @@ static int pxa168_pcie_resume(struct platform_device *pdev)
 
 static struct platform_driver pxa168_pcie_driver = {
 	.suspend	= pxa168_pcie_suspend,
-	.resume_early	= pxa168_pcie_resume,
+	.resume		= pxa168_pcie_resume,
 	.driver		= {
 		.name	= "pxa168-pcie",
 		.owner	= THIS_MODULE,
