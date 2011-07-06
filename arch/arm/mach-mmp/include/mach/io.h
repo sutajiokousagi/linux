@@ -27,9 +27,9 @@
 
 #define __pxa168_mem_pci(a)      ((u32)a)
 #define __mem_ptrio(a) ((void __iomem *)a)
-#define __mem_ptr8(a) (u8 *)a)
-#define __mem_ptr16(a) (u16 *)a)
-#define __mem_ptr32(a) (u32 *)a)
+#define __mem_ptr8(a) ((u8 *)a)
+#define __mem_ptr16(a) ((u16 *)a)
+#define __mem_ptr32(a) ((u32 *)a)
 
 /*
  * We , we simply return the actual PCI
