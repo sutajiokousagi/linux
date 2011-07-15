@@ -1265,11 +1265,11 @@ static int wm8753_set_bias_level(struct snd_soc_codec *codec,
 	switch (level) {
 	case SND_SOC_BIAS_ON:
 		/* set vmid to 50k and unmute dac */
-		wm8753_write(codec, WM8753_PWR1, pwr_reg | 0x00c0);
+		wm8753_write(codec, WM8753_PWR1, pwr_reg | 0x00e0);
 		break;
 	case SND_SOC_BIAS_PREPARE:
 		/* set vmid to 5k for quick power up */
-		wm8753_write(codec, WM8753_PWR1, pwr_reg | 0x01c1);
+		wm8753_write(codec, WM8753_PWR1, pwr_reg | 0x01e1);
 		break;
 	case SND_SOC_BIAS_STANDBY:
 		/* mute dac and set vmid to 500k, enable VREF */
@@ -1659,6 +1659,7 @@ static int wm8753_register(struct wm8753_priv *wm8753)
 
 	/* charge output caps */
 	wm8753_set_bias_level(codec, SND_SOC_BIAS_PREPARE);
+	codec->bias_level = SND_SOC_BIAS_STANDBY;
 	schedule_delayed_work(&codec->delayed_work,
 			      msecs_to_jiffies(caps_charge));
 
@@ -1680,8 +1681,10 @@ static int wm8753_register(struct wm8753_priv *wm8753)
 	reg = wm8753_read_reg_cache(codec, WM8753_ROUT2V);
 	wm8753_write(codec, WM8753_ROUT2V, reg | 0x0100);
 	reg = wm8753_read_reg_cache(codec, WM8753_LINVOL);
+	reg &= ~0x80;
 	wm8753_write(codec, WM8753_LINVOL, reg | 0x0100);
 	reg = wm8753_read_reg_cache(codec, WM8753_RINVOL);
+	reg &= ~0x80;
 	wm8753_write(codec, WM8753_RINVOL, reg | 0x0100);
 
 	wm8753_codec = codec;
