@@ -191,8 +191,8 @@ static void platform_specific_sdio (struct sdhci_host *host, int enable)
 static void platform_specific_reset (struct sdhci_host *host, u8 mask)
 {
 	DBG("ENTER: %s mask == SDHCI_RESET_ALL = %d\n", mmc_hostname (host->mmc), mask == SDHCI_RESET_ALL);
-       if (mask & SDHCI_RESET_ALL)
-               platform_init_after_reset (host);
+	if ((mask & SDHCI_RESET_ALL) == SDHCI_RESET_ALL)
+		platform_init_after_reset(host);
 }
 
 static int platform_specific_get_ro(struct mmc_host *mmc)
