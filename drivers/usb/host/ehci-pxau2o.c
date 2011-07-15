@@ -262,7 +262,7 @@ static int pxa9xx_ehci_probe(struct platform_device *pdev)
 	}
 
 	hcd->self.controller = dev;
-	hcd->self.bus_name = dev->bus_id;
+	hcd->self.bus_name = dev->bus->name;	/* correction for bus name */
 	hcd->product_desc ="pxa9xx ehci";
 
 	clk_enable(clk_get(NULL, "U2OCLK"));
