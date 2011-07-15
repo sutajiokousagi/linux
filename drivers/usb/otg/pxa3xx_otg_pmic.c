@@ -27,7 +27,7 @@ static int otg_vbus_init(void)
 /* Enable or disable USB Vbus
    session_enable: whether support to start a session by using VBUS
  */
-static int otg_set_vbus(int vbus_type)
+static int pxa3xx_otg_set_vbus(int vbus_type)
 {
 	int status = 0;
 
@@ -75,7 +75,7 @@ static int otg_set_vbus_ic(int function)
 
 static struct otg_pmic_ops pxa3xx_otg_pmic_ops = {
 	.otg_vbus_init          = otg_vbus_init,
-	.otg_set_vbus           = otg_set_vbus,
+	.otg_set_vbus           = pxa3xx_otg_set_vbus,
 	.otg_set_vbus_ic        = otg_set_vbus_ic,
 };
 

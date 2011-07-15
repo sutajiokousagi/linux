@@ -364,7 +364,7 @@ static void otg_a_wait_vfail(struct pxa_otg *pxa_otg)
 	pxa_otg->otg_ctrl->a_vbus_vld = 0;
 }
 
-int otg_init(struct pxa_otg *pxa_otg)
+int pxa3xx_otg_init(struct pxa_otg *pxa_otg)
 {
 	enum otg_function function;
 
@@ -764,7 +764,7 @@ static int pxa_otg_set_peripheral(struct otg_transceiver *otg,
 		pxa_otg->otg.gadget = gadget;
 		otg_ctrl = pxa_otg->otg_ctrl;
 		local_irq_save(flags);
-		ret = otg_init(pxa_otg);
+		ret = pxa3xx_otg_init(pxa_otg);
 		if (ret) {
 			pr_err("%s: failed to call otg_init:%d\n",
 			       __FUNCTION__, ret);
@@ -1072,7 +1072,7 @@ static int otg_proc_write(struct file *filp, const char *buffer,
 		/* Device expects to use the bus */
 	case 1:
 		if (rely_on_vbus) {
-			otg_init(pxa_otg);
+			pxa3xx_otg_init(pxa_otg);
 			if (pxa_otg->otg.default_a == OTG_A_DEVICE) {
 				pxa_otg->otg_ctrl->a_bus_req = 1;
 
@@ -1084,7 +1084,6 @@ static int otg_proc_write(struct file *filp, const char *buffer,
 		} else
 			pxa_otg->otg_ctrl->b_bus_req = 1;
 		pxa3xx_update_otg(pxa_otg);
-
 		break;
 
 		/* After complete use usb device. Suspend the device connected */
