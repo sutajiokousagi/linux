@@ -1411,6 +1411,10 @@ static int _pxa168fb_suspend(struct pxa168fb_info *fbi, pm_message_t mesg)
 
 	fb_set_suspend(info, 1);
 
+#ifndef CONFIG_HAS_EARLYSUSPEND
+	clk_disable(fbi->clk);
+#endif
+
 	return 0;
 }
 
