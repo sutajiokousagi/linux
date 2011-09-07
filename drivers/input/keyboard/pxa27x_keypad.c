@@ -135,9 +135,9 @@ static void pxa27x_keypad_build_keycode(struct pxa27x_keypad *keypad)
 
 	key = &pdata->matrix_key_map[0];
 	for (i = 0; i < pdata->matrix_key_map_size; i++, key++) {
-		int row = ((*key) >> 28) & 0xf;
-		int col = ((*key) >> 24) & 0xf;
-		int code = (*key) & 0xffffff;
+		int row = ((*key) >> 24) & 0xf;
+		int col = ((*key) >> 16) & 0xf;
+		int code = (*key) & 0xffff;
 
 		keypad->matrix_keycodes[(row << 3) + col] = code;
 		set_bit(code, input_dev->keybit);
@@ -534,9 +534,9 @@ static ssize_t pxa27x_keypad_store(struct device *dev, \
 	ret = sscanf(buf, "%d %d", &keycode_old, &keycode_new);
 	if(ret == 2) {
 		for (i = 0; i < pdata->matrix_key_map_size; i++, key++) {
-			int row = ((*key) >> 28) & 0xf;
-			int col = ((*key) >> 24) & 0xf;
-			int code = (*key) & 0xffffff;
+			int row = ((*key) >> 24) & 0xf;
+			int col = ((*key) >> 16) & 0xf;
+			int code = (*key) & 0xffff;
 
 			if (code == keycode_old) {
 				printk("\nold keycode   :%d\t new keycode: %d\n",code, keycode_new);
