@@ -1130,6 +1130,8 @@ static void avenger_lite_power_off(void)
 	while (1);
 }
 
+#ifdef CONFIG_USB_ANDROID
+
 #define NUM_ANDROID_USB_FUNCTIONS 2
 char *android_usb_functions[NUM_ANDROID_USB_FUNCTIONS]
 	= {"usb_mass_storage", "adb"};
@@ -1171,6 +1173,8 @@ static void __init android_init(void)
 	platform_device_register(&android_usb);
 	platform_device_register(&usb_mass_storage);
 }
+
+#endif
 
 static void avengers_sel_debug(void)
 {
@@ -1250,7 +1254,9 @@ static void __init avengers_lite_init(void)
 #endif
 
 	if (is_android())
+#ifdef CONFIG_USB_ANDROID
 		android_init();
+#endif
 
 	gpio_ec_init();
     
