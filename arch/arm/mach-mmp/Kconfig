@@ -2,6 +2,12 @@ if ARCH_MMP
 
 menu "Marvell PXA168 Processor Variants"
 
+config CPU_PXA168_A0
+	bool "PXA168 A0 Stepping"
+	help
+	 Say 'Y' here if you want to support Marvell PXA168-based A0
+	 Silicon
+
 config CPU_PXA168_B0
 	bool "PXA168 B0 Stepping"
         help
