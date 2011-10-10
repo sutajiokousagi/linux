@@ -32,6 +32,7 @@
 #include <mach/camera.h>
 #include <mach/pxa168_eth.h>
 #include <mach/pxa168_pcie.h>
+#include <mach/cputype.h>
 
 #include <plat/part_table.h>
 #include <plat/generic.h>
@@ -248,6 +249,11 @@ static struct platform_device smc91x_device = {
 
 static int pxa168_eth_init(void) 
 {
+	if (cpu_is_pxa168_A0()) {
+		printk(KERN_ERR "FE for pxa168 A0 not supported\n");
+		return -EIO;
+	}
+
 	if (gpio_request(ENET_RESET_N, "ENET_RESET_N")) {
 		printk(KERN_ERR "Request GPIO failed,"
 				"gpio: %d \n", ENET_RESET_N);
