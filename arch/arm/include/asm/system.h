@@ -245,6 +245,11 @@ do {									\
 #define swp_is_buggy
 #endif
 
+#if defined(CONFIG_CPU_PXA168_A0)
+/* DPF-717 */
+#define swp_is_buggy
+#endif
+
 static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size)
 {
 	extern void __bad_xchg(volatile void *, int);
