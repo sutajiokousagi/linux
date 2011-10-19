@@ -195,12 +195,14 @@ void mspm_do_idle(void)
 		msec = get_remain_slice();
 		record_idle_stats();
 
-		if (lpidle_is_valid(enable_deepidle, msec, &freqs, \
+		if (cpu_is_pxa168_A0() == 0) {
+			if (lpidle_is_valid(enable_deepidle, msec, &freqs, \
 				IDLE_SYS_SLEEP)) {
-			ret = dvfm_set_op(&freqs, freqs.new,
+				ret = dvfm_set_op(&freqs, freqs.new,
 					RELATION_STICK);
-			if (ret == 0)
-				goto out;
+				if (ret == 0)
+					goto out;
+			}
 		}
 		if (enable_deepidle & IDLE_CORE_EXTIDLE) {
 #ifdef CONFIG_MSPM_PXA168_STATS
