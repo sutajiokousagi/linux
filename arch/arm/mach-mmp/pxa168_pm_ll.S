@@ -905,7 +905,18 @@ hibernate_sram_end:
 @	None
 @
 
+
 ENTRY(pxa168_pm_swi)
 	stmfd	sp!, {r3 - r12, lr}
+
+#ifdef CONFIG_COREIDLE_DELAY
+	.fill 32, 4, 0xe1a00000			@ 32 NOPS (mov r0,r0)
+#endif
+
 	mcr	p15, 0, r0, c7, c0, 4		@ Wait for interrupt
+
+#ifdef CONFIG_COREIDLE_DELAY
+	.fill 32, 4, 0xe1a00000			@ 32 NOPS (mov r0,r0)
+#endif
+
         ldmfd   sp!, {r3 - r12, pc}
