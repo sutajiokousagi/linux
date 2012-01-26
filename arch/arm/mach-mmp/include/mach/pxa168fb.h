@@ -333,6 +333,9 @@ struct pxa168fb_info {
         unsigned                enabled:1;
         unsigned                edid_en:1;
 
+	int			interlaced;
+	int			field;
+
         /*
          * 0: DMA mem is from DMA region.
          * 1: DMA mem is from normal region.

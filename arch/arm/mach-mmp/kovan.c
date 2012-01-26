@@ -839,22 +839,6 @@ static inline void kovan_init_spi(void) {}
 
 
 #if defined(CONFIG_MMC_PXA_SDH)
-static struct pfn_cfg mmc1_pfn_cfg[] = {
-	PFN_CFG(PIN_MMC_DAT7, GPIO37_MMC1_DAT7, GPIO37_GPIO),
-	PFN_CFG(PIN_MMC_DAT6, GPIO38_MMC1_DAT6, GPIO38_GPIO),
-	PFN_CFG(PIN_MMC_DAT5, GPIO54_MMC1_DAT5, GPIO54_GPIO),
-	PFN_CFG(PIN_MMC_DAT4, GPIO48_MMC1_DAT4, GPIO48_GPIO),
-	PFN_CFG(PIN_MMC_DAT3, GPIO51_MMC1_DAT3, GPIO51_GPIO),
-	PFN_CFG(PIN_MMC_DAT2, GPIO52_MMC1_DAT2, GPIO52_GPIO),
-	PFN_CFG(PIN_MMC_DAT1, GPIO40_MMC1_DAT1, GPIO40_GPIO),
-	PFN_CFG(PIN_MMC_DAT0, GPIO41_MMC1_DAT0, GPIO41_GPIO),
-	PFN_CFG(PIN_MMC_CMD, GPIO49_MMC1_CMD, GPIO49_GPIO),
-	PFN_CFG(PIN_MMC_CLK, GPIO43_MMC1_CLK, GPIO43_GPIO),
-	PFN_CFG(PIN_MMC_CD, GPIO53_MMC1_CD, GPIO53_GPIO),
-	PFN_CFG(PIN_MMC_WP, GPIO46_MMC1_WP, GPIO46_GPIO),
-	PFN_CFG(PIN_MMC_END, PFN_TERM, PFN_TERM),
-};
-
 static struct pfn_cfg mmc3_pfn_cfg[] = {
 	PFN_CFG(PIN_MMC_DAT7, GPIO0_MMC3_DAT7, GPIO0_GPIO),
 	PFN_CFG(PIN_MMC_DAT6, GPIO1_MMC3_DAT6, GPIO1_GPIO),
@@ -872,24 +856,6 @@ static struct pfn_cfg mmc3_pfn_cfg[] = {
 };
 #endif
 
-
-static int sdh_mfp_config_mmc1(void)
-{
-	int ret = 0;
-
-	ret = kovan_pinmux_switch(SW_CARD);
-	if (!ret)
-		pfn_config(mmc1_pfn_cfg, PFN_FN);
-	return ret;
-}
-
-static struct pxasdh_platform_data kovan_sdh_platform_data_mmc1 = {
-	.detect_delay	= 20,
-	.ocr_mask	= MMC_VDD_29_30 | MMC_VDD_30_31,
-	.mfp_config	= sdh_mfp_config_mmc1,
-	.bus_width	= 4,
-	.pfn_table	= mmc1_pfn_cfg,
-};
 
 #if defined(CONFIG_MMC3)
 static struct pxasdh_platform_data kovan_sdh_platform_data_mmc3 = {
@@ -1003,7 +969,6 @@ static void __init kovan_init(void)
 	pxa168_add_pcie(&pxa168_pcie_data);
 #endif
 #if defined(CONFIG_MMC_PXA_SDH)
-	pxa168_add_sdh(0, &kovan_sdh_platform_data_mmc1);
 #if defined(CONFIG_MMC3)
 	pxa168_add_sdh(2, &kovan_sdh_platform_data_mmc3);
 #endif
