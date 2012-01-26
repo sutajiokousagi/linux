@@ -178,6 +178,7 @@ static int vt_event_wait_ioctl(struct vt_event __user *event)
 
 int vt_waitactive(int n)
 {
+#ifndef CONFIG_MACH_KOVAN
 	struct vt_event_wait vw;
 	do {
 		if (n == fg_console + 1)
@@ -187,6 +188,7 @@ int vt_waitactive(int n)
 		if (vw.done == 0)
 			return -EINTR;
 	} while (vw.event.newev != n);
+#endif
 	return 0;
 }
 
