@@ -281,7 +281,8 @@ static void i2c_pxa_scream_blue_murder(struct pxa_i2c *i2c, const char *why)
 		printk("[%08x:%08x] ", i2c->isrlog[i], i2c->icrlog[i]);
 	printk("\n");
 #else
-	printk("warning: i2c: <%s> slave_0x%x %s\n", i2c->adap.name, 
+	if (i2c_debug)
+		printk("warning: i2c: <%s> slave_0x%x %s\n", i2c->adap.name, 
 			i2c->req_slave_addr >> 1, why);
 #endif
 }
