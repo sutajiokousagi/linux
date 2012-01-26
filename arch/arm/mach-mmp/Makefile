@@ -12,6 +12,7 @@ obj-$(CONFIG_CPU_MMP2)		+= mmp2.o irq-mmp2.o
 # board support
 obj-$(CONFIG_MACH_ASPENITE)	+= aspenite.o
 obj-$(CONFIG_MACH_ZYLONITE2)	+= aspenite.o
+obj-$(CONFIG_MACH_KOVAN)	+= kovan.o
 obj-$(CONFIG_MACH_TETON_BGA)    += teton_bga.o
 obj-$(CONFIG_MACH_IPCAM)	+= ipcam.o
 obj-$(CONFIG_MACH_DKB_GENERIC)	+= dkb_generic.o

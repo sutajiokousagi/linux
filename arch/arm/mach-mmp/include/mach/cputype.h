@@ -39,7 +39,7 @@
 
 #ifdef CONFIG_CPU_PXA168
 #  define __cpu_is_pxa168(id, cid)	\
-	({ unsigned int _id = (id) & 0xffff; _id == 0x9263; })
+	({ unsigned int _id = (id) & 0xffff; _id == 0x9265; })
 #else
 #  define __cpu_is_pxa168(id, cid)	(0)
 #endif
