@@ -30,7 +30,6 @@
 
 #include <linux/spi/spi.h>
 #include <linux/spi/flash.h>
-#define DEBUG
 
 /* Flash opcodes. */
 #define	OPCODE_WREN		0x06	/* Write enable */
