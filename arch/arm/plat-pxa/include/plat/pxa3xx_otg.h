@@ -164,7 +164,9 @@ struct pxa_otg {
 #define OTG_INT_LS	(1 << 5)
 #define OTG_INT_LP_DIS	(1 << 6)
 
+#ifndef CONFIG_MACH_KOVAN
 #define PXA3xx_OTG_VBUS_PMIC
+#endif
 
 extern void pxa3xx_otg_require_bus(int require);
 
