@@ -312,7 +312,7 @@ static int mmp_rtc_probe(struct platform_device *pdev)
 		ret = -ENXIO;
 		goto err;
 	}
-	//disable_irq(irq_alrm);
+	disable_irq(irq_alrm);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (res == NULL) {
