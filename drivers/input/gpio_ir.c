@@ -12,12 +12,16 @@
  * published by the Free Software Foundation.
  *
  */
+
+
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/delay.h>
 #include <linux/jiffies.h>
 #include <linux/kernel.h>
 #include <linux/input.h>
+#include <linux/irq.h>
+#include <linux/slab.h>
 
 #include <mach/gpio_ir.h>
 #include <mach/ir_key_def.h>
@@ -25,14 +29,11 @@
 
 #include <linux/platform_device.h>
 #include <linux/interrupt.h>
-#include <linux/slab.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/gpio.h>
 
-
-/* Only and only one XXX_READOUT_IRCBUFFER can be defined */
-#define MARVELL_READOUT_IRCBUFFER
+MODULE_LICENSE("GPL");
 
 /*
  * Nec SC33 code:
@@ -56,232 +57,168 @@
 #define word_size 	32     	/*word size according to the protocol */
 #define calibration_n 	2167    /* timer resolution eq=1500 OS timer HZ */
 
-struct input_dev *cir_input_dev; /* Representation of an input device */
-static struct platform_device *cir_dev_in; /* Device structure */
+
+#define IR_SHIFT(x)     (x % (sizeof(int) * 8)) /* Shift6*/
+#define GPIO_BIT(x)     (1 << ((x) & 0x1f))
 
 /*
  * Circular buffer
  */
 #define CIRC_BUFF_MASK 0x3ff
 #define CIRC_BUFF_LENGTH 0x400
-unsigned int cbuffer[CIRC_BUFF_LENGTH];
-unsigned int cb_start=0, cb_end=0;
-int ir_pin;
+static unsigned int cbuffer[CIRC_BUFF_LENGTH];
+static unsigned int cb_start=0, cb_end=0;
 
-
-unsigned int ir_code_bit = 0;
 
 /*
  * Table of IR-signal-code and key
  */
-ir_key_table_t marvell_nec_ir_key_table[] = {
+ir_key_table_t nikon_key_table[] = {
+	/* Old, Nikon remote */
+	{0xb946f685, KEY_PAGEUP},
+	{0xba45f685, KEY_PAGEDOWN},
+	{0xbc43f685, KEY_UP},
+	{0xbd42f685, KEY_LEFT},
+	{0xbf40f685, KEY_ENTER},
+	{0xbe41f685, KEY_RIGHT},
+	{0xbb44f685, KEY_DOWN},
+	{0xb748f685, KEY_1},
+	{0xb847f685, KEY_2},
 
-	{0x00, MV_IR_KEY_DIGIT_1},
-	{0x01, MV_IR_KEY_DIGIT_2},
-	{0x02, MV_IR_KEY_DIGIT_3},
-	{0x03, MV_IR_KEY_DIGIT_4},
-	{0x04, MV_IR_KEY_DIGIT_5},
-	{0x05, MV_IR_KEY_DIGIT_6},
-	{0x06, MV_IR_KEY_DIGIT_7},
-	{0x07, MV_IR_KEY_DIGIT_8},
-	{0x08, MV_IR_KEY_DIGIT_9},
-	{0x09, MV_IR_KEY_DIGIT_10},
-	{0x0A, MV_IR_KEY_DIGIT_11},
-	{0x0B, MV_IR_KEY_DIGIT_12},
-	{0x0C, MV_IR_KEY_DIGIT_13},
-	{0x0D, MV_IR_KEY_DIGIT_14},
-	{0x0E, MV_IR_KEY_DIGIT_15},
-	{0x0F, MV_IR_KEY_DIGIT_16},
-	{0x10, MV_IR_KEY_DIGIT_17},
-	{0x11, MV_IR_KEY_DIGIT_18},
-	{0x12, MV_IR_KEY_DIGIT_19},
-	{0x13, MV_IR_KEY_DIGIT_20},
-	{0x14, MV_IR_KEY_DIGIT_21},
-	{0x15, MV_IR_KEY_DIGIT_22},
-	{0x16, MV_IR_KEY_DIGIT_23},
-	{0x17, MV_IR_KEY_DIGIT_24},
-	{0x18, MV_IR_KEY_DIGIT_25},
-	{0x19, MV_IR_KEY_DIGIT_26},
-	{0x1A, MV_IR_KEY_DIGIT_27},
-	{0x1B, MV_IR_KEY_DIGIT_28},
-	{0x1C, MV_IR_KEY_DIGIT_29},
-	{0x1D, MV_IR_KEY_DIGIT_30},
-	{0x1E, MV_IR_KEY_DIGIT_31},
-	{0x1F, MV_IR_KEY_DIGIT_32},
-	{0x20, MV_IR_KEY_DIGIT_33},
-	{0, MV_IR_KEY_NULL},
+	/* New remote */
+	{0xb946fe85, KEY_PAGEUP},//KEY_CONFIG},
+	{0xba45fe85, KEY_PAGEDOWN},//KEY_VENDOR},
+	{0xbc43fe85, KEY_UP},
+	{0xbd42fe85, KEY_LEFT},
+	{0xbf40fe85, KEY_ENTER},
+	{0xbe41fe85, KEY_RIGHT},
+	{0xbb44fe85, KEY_DOWN},
 
+	/* End of line */
+	{0,          0},
 };
 
-ir_key_table_t *ir_key_table = marvell_nec_ir_key_table;
+ir_key_table_t *ir_key_table = nikon_key_table;
+int last_key = 0;
 
-unsigned int ir_key = MV_IR_KEY_NULL;
-unsigned int ir_key_recvflag = 0;
-
-/*
- * structure to store the time when interrupt comes
- */
-typedef struct system_time {
-	unsigned int jiff;
-	unsigned int base;
-} system_time_t;
-system_time_t len_time = {0, 0};
-
-/*
- * analyse the level length based on NEC protocol.
- * NEC ir transmitter timing:
- * Preamble: 9ms/4.5ms/0.56ms, Bit1: 1.69ms/0.56ms, Bit0: 0.56ms/0.56ms.
- * Hold: 9ms/2.25ms/0.56ms
- */
-static unsigned int word = 0, dont_send_more=0 , count_word = 0 , preamble = 0;
-static unsigned int end = 0, i=0;
-
-
-/*
- *Analyse the address and key
- *
- */
-static void analyseword (int word)
+static void send_keyup(unsigned long data)
 {
-/* printk(KERN_DEBUG  "%x\n", word); */
-if ((word << CODE_SIZE) == (CUSTOM_CODE << CODE_SIZE) && !dont_send_more) {
-	if ((word & 0xff000000)==(~(word << 8) & 0xff000000)){
-	 	ir_key = MV_IR_KEY_NULL;
-		i = 0;
-	/* check for the key */
-		while (ir_key_table[i].ir_key != MV_IR_KEY_NULL) {
-			if ((ir_key_table[i].ir_encode) == ((word & 0xff0000)
-				>> CODE_SIZE)) {
-				ir_key = ir_key_table[i].ir_key;
-/*				printk(KERN_INFO "Key %d was found\n",ir_key);*/
-				input_report_key(cir_input_dev, ir_key , 1);
-				input_report_key(cir_input_dev, ir_key , 0);
-				cb_start = cb_end;
-				dont_send_more = 1;
-				break;
-			}
+	struct cir_device *cir = (struct cir_device *)data;
+	if (last_key)
+		input_report_key(cir->input_dev, last_key, 0);
+	last_key = 0;
+}
+DEFINE_TIMER(send_keyup_timer, send_keyup, 0, 0);
 
-		i++;
-		}
-	/* key not found, just noises */
-	}
-}
-else { uart_putc('N');
-}
-}
-static void clear_ircbuffer (void)
+static int decode_command(struct cir_device *cir, unsigned int cmd)
 {
-	unsigned int event_len;
+	ir_key_table_t *key = ir_key_table;
+	while (key->ir_encode) {
+		if (key->ir_encode == cmd) {
+			dev_dbg(&cir->pdev->dev,
+				"Found key %d\n", key->ir_key);
+			if (last_key)
+				input_report_key(cir->input_dev, last_key , 0);
+			last_key = key->ir_key;
+			input_report_key(cir->input_dev, key->ir_key , 1);
 
-	while ((cb_start != cb_end) && (((cb_start+1) & CIRC_BUFF_MASK) != cb_end)) {
-		event_len = cbuffer[cb_start]*1000;
-		/*printk(KERN_INFO "%u\n",event_len); */
-		cb_start++;
-		cb_start &= CIRC_BUFF_MASK;
-		if ((event_len > ZERO_MIN) && (event_len < ZERO_MAX)) {
-			uart_putc('0');
-			if (preamble == 1) {
-				count_word++;
-			}
-			if (count_word == word_size) {
-			analyseword (word);
-			count_word = 0;
-			preamble = 0;
-			word = 0;
-			}
-			continue;
+			return 0;
 		}
-		if ((event_len >= ONE_MIN) && (event_len < ONE_MAX)) {
-			uart_putc('1');
-			if (preamble == 1) {
-				word |= 1 << count_word;
-				count_word++;
-			}
-			if (count_word == word_size) {
-			analyseword (word);
-			count_word = 0;
-			preamble = 0;
-			word = 0;
-			}
-			continue;
-		}
-		if ((event_len > PREAM_MIN) && (event_len < PREAM_MAX)) {
-			uart_putc('P');
-			preamble = 1;
-			count_word = 0;
-			end = 0;
-			continue;
-		}
-		if ((event_len > END_MIN) && (event_len < END_MAX)){
-			uart_putc('S');
-			continue;
-		}
-		if (event_len > ENDED){
-			uart_putc('E');
-			dont_send_more = 0;
-			continue;
-		}
+		key++;
 	}
-
+	dev_dbg(&cir->pdev->dev, "No key found for code 0x%08x\n", cmd);
+	return 1;
 }
+
 /*
  * This function should be called in an independent thread.
  * It reads out bit-wised code.
  */
-void readout_ircbuffer(unsigned long nodata)
+static void process_times(unsigned long data)
 {
-	clear_ircbuffer();
+	struct cir_device *cir = (struct cir_device *)data;
+	int event_count = 0;
+	unsigned int cmd;
+	unsigned int cmd_shift;
+	unsigned long length, active;
+
+	cmd = 0;
+	cmd_shift = 0;
+
+	while (cb_start != cb_end) {
+		event_count++;
+		length = cbuffer[cb_start] & ~0x80000000L;
+		active = !(cbuffer[cb_start] >> 31);
+
+		/* Advance to the next spot in the buffer */
+		cb_start = (cb_start+1) & CIRC_BUFF_MASK;
+
+		/* For this protocol, we only consider the rising edges */
+		if (!active)
+			continue;
+
+		/* Convert from ticks to usecs */
+		length = (length*10000)>>15;
+
+
+		/* Start-of-packet messages are about 4.5 ms */
+		if (length > 2000 || length == 0) {
+			cmd_shift = 0;
+			continue;
+		}
+
+		else if (length <= 2000 && length > 1300)
+			cmd |= (1<<cmd_shift++);
+		else if (length <= 700 && length > 400)
+			cmd |= (0<<cmd_shift++);
+		else
+			dev_err(&cir->pdev->dev,
+				"Event %lu doesn't match anything\n", length);
+
+		//dev_dbg(&cir->pdev->dev, "Event %lu usec long: %lu\n",
+		//	length, active);
+
+	}
+	if (cmd)
+		decode_command(cir, cmd);
+
+	send_keyup_timer.data = (unsigned long)cir;
+	mod_timer(&send_keyup_timer, jiffies + msecs_to_jiffies(200));
+
+	if (cmd)
+		dev_dbg(&cir->pdev->dev, "Read out %d events: 0x%08x\n",
+			event_count, cmd);
 	return;
 }
 
-/*
- * Store the event length
- */
-static void store_ircbuffer(unsigned int event_len)
-{
-	cbuffer[cb_end] = event_len;
-	cb_end++;
-	cb_end &= CIRC_BUFF_MASK;
+DEFINE_TIMER(process_time_timer, process_times, 0, 0);
 
-	/*
-	 * if cb_start is equal to cb_end, there's no new data in the cbuffer.
-	 * Therefore, we have to avoid that, because we're writing a new data.
-	 *
-	 */
-	if (cb_end == cb_start) {
-		cb_start++;
-		cb_start &= CIRC_BUFF_MASK;
-	}
-}
-
-void cir_free(struct cir_device *cir)
-{
-/*free IRQ */
-}
-EXPORT_SYMBOL(cir_free);
-
-DECLARE_TASKLET(clearbuf, readout_ircbuffer, 0);
 
 static irqreturn_t cir_interrupt(int irq, void *dev_id)
 {
-	unsigned int event_len;
+	struct cir_device *cir = (struct cir_device *)dev_id;
+	static unsigned long this, prev;
 
-		/*
-	 	 *
-	   	 * Calculate the length of the event 
-	 	 *
-	 	 */
-		len_time.base = len_time.jiff;
-		len_time.jiff = timer_services_counter_read(COUNTER_0) /
-		 	calibration_n; 
-		event_len = (len_time.jiff > len_time.base) ?
-			 (len_time.jiff - len_time.base) : (len_time.jiff +
-			 0xffffffff - len_time.base);
-		store_ircbuffer(event_len);
-		if (event_len > (END_MIN/1000)) {
-		tasklet_schedule(&clearbuf);
-		}
-	return 0;
+	prev = this;
+	this = timer_services_counter_read(COUNTER_0);
+
+	/* This is true when the buffer has just been emptied, so
+	 * the time will need to be 0.
+	 */
+	if (cb_end == cb_start)
+		prev = this;
+
+	cbuffer[cb_end] = ((this - prev) & 0x7fffffffL)
+		 	| ((__raw_readl(cir->mmio_base + 0x00) & 0x40) << 25);
+
+	cb_end = (cb_end+1) & CIRC_BUFF_MASK;
+	if (cb_end == cb_start)
+		cb_start = (cb_start+1) & CIRC_BUFF_MASK;
+
+	process_time_timer.data = (unsigned long)cir;
+	mod_timer(&process_time_timer, jiffies + msecs_to_jiffies(20));
+
+	return IRQ_HANDLED;
 }
 
 /**
@@ -292,7 +229,9 @@ static irqreturn_t cir_interrupt(int irq, void *dev_id)
 void cir_enable(struct cir_dev *dev)
 {
 	struct cir_device *cir = dev->cir;
-	__raw_writel(GPIO_BIT(IR_SHIFT), cir->mmio_base + GAPMASK0);
+	__raw_writel(GPIO_BIT(IR_SHIFT(cir->pin)), cir->mmio_base + GAPMASK0);
+	__raw_writel(GPIO_BIT(IR_SHIFT(cir->pin)), cir->mmio_base + GSFER0);
+	__raw_writel(GPIO_BIT(IR_SHIFT(cir->pin)), cir->mmio_base + GSRER0);
 }
 
 EXPORT_SYMBOL(cir_enable);
@@ -306,7 +245,7 @@ void cir_disable(struct cir_dev *dev)
 {
 	struct cir_device *cir = dev->cir;
 
-	__raw_writel(GPIO_BIT(IR_SHIFT), cir->mmio_base + GCPMASK0);
+	__raw_writel(GPIO_BIT(IR_SHIFT(cir->pin)), cir->mmio_base + GCPMASK0);
 }
 
 EXPORT_SYMBOL(cir_disable);
@@ -318,15 +257,13 @@ EXPORT_SYMBOL(cir_disable);
 
 static int cir_suspend(struct platform_device *pdev, pm_message_t state)
 {
-
-/* require timer services can be disabled */
+	/* require timer services can be disabled */
 	return 0;
 }
 
 static int cir_resume(struct platform_device *pdev)
 {
 	/* require timer services resume to be enabled */
-
 	return 0;
 }
 #else
@@ -336,10 +273,11 @@ static int cir_resume(struct platform_device *pdev)
 
 static int __devinit cir_probe(struct platform_device *pdev)
 {
-
 	struct cir_device *cir;
 	struct resource *res;
 	int ret = 0;
+	int key;
+
    	cir = kzalloc(sizeof(struct cir_device), GFP_KERNEL);
    	if (cir == NULL) {
       		dev_err(&pdev->dev, "failed to allocate memory\n");
@@ -347,65 +285,73 @@ static int __devinit cir_probe(struct platform_device *pdev)
    	}
 	
 	/* Allocate an input device data structure */
-	cir_input_dev = input_allocate_device();
-	if (!cir_input_dev) {
+	cir->input_dev = input_allocate_device();
+	if (!cir->input_dev) {
+		kfree(cir);
 		return -ENOMEM;
 	}
 
-	cir->input_dev = cir_input_dev;
+	/* Allocate GPIO memory range */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (res == NULL) {
 		dev_err(&pdev->dev,"no memory resource defined\n");
-		ret = -ENODEV;
-		}
-	cir->mmio_base = ioremap_nocache(res->start, SZ_256);
-	printk(KERN_DEBUG "cir->address 0x%p", cir->mmio_base);
-	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-	if (res == NULL) {
-		dev_err(&pdev->dev, "no memory resource defined\n");
+		input_free_device(cir->input_dev);
+		kfree(cir);
 		ret = -ENODEV;
 	}
-	
+	cir->mmio_base = ioremap_nocache(res->start, SZ_256);
+	dev_dbg(&pdev->dev, "cir->address 0x%p", cir->mmio_base);
+
+	/* Figure out which GPIO IRQ to use */
 	cir->irq = platform_get_irq(pdev, 0);
-	printk(KERN_DEBUG "cir->irq : %d \n", cir->irq);
+	dev_dbg(&pdev->dev, "cir->irq : %d \n", cir->irq);
 	if (cir->irq < 0) {
 		dev_err(&pdev->dev, "no IRQ resource defined\n");
 		ret = -ENODEV;
 		goto err_free_io;
 	}
 
-	ir_pin = IRQ_TO_GPIO(cir->irq);
-	ret = request_irq(cir->irq ,cir_interrupt ,IRQF_TRIGGER_FALLING ,"CIR"
-		,cir);
-	printk(KERN_DEBUG "ret from request irq. %d\n", ret);
-	printk(KERN_DEBUG "the is set to irq. %d\n", cir->irq);
-   	if (ret)goto
-		err_free_io;
+	/* Actually set up the IRQ */
+	ret = request_irq(cir->irq, cir_interrupt,
+			  IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
+			  "IR port", cir);
+	dev_dbg(&pdev->dev, "ret from request irq. %d\n", ret);
+   	if (ret) {
+		dev_err(&pdev->dev, "Unable to request IRQ: %d\n", ret);
+		goto err_free_io;
+	}
+
+	cir->pin = IRQ_TO_GPIO(cir->irq);
+
 	platform_set_drvdata(pdev, cir);
-	printk(KERN_DEBUG " Initialize CIR driver completed \n");
+	dev_dbg(&pdev->dev, " Initialize CIR driver completed \n");
+
 	/* setup input device */
-	cir_input_dev->name = "aspenite_cir";
-	cir_input_dev->phys = "aspenite_cir/input2";
-	cir_input_dev->dev.parent = &pdev->dev;
-	cir->pdev = pdev->dev.platform_data;
-	cir_input_dev->evbit[0] = BIT(EV_KEY);
+	cir->input_dev->name = "aspenite_cir";
+	cir->input_dev->phys = "aspenite_cir/input2";
+	cir->input_dev->dev.parent = &pdev->dev;
+	cir->input_dev->evbit[0] = BIT(EV_KEY) | BIT(EV_REP);
+	cir->pdev = pdev;
 
 	/* Announce that the CIR will generate  key map */
-	ir_key = MV_IR_KEY_NULL;
-	for (i=0; i< 33;) {
-		ir_key = ir_key_table[i].ir_key;
-		set_bit(ir_key, cir_input_dev->keybit);
-		i++;
-	}
-	printk(KERN_DEBUG " key map was set \n");
+	for (key=0; ir_key_table[key].ir_key; key++)
+		set_bit(ir_key_table[key].ir_key, cir->input_dev->keybit);
+	dev_dbg(&pdev->dev, "Key map was set \n");
+
 	/* Register with the input subsystem */
-	if (input_register_device(cir_input_dev)) 
-		printk(KERN_DEBUG "can't register CIR_input Driver.\n");
-	printk(KERN_DEBUG "CIR_input Driver Initialized.\n");
+	if (input_register_device(cir->input_dev)) 
+		dev_err(&pdev->dev, "Can't register CIR_input Driver.\n");
+	dev_dbg(&pdev->dev, "Driver Initialized.\n");
 
 	return 0;
 	
 err_free_io:
+	if (cir && cir->irq > 0)
+		free_irq(cir->irq, cir);
+	if (cir && cir->input_dev)
+		input_free_device(cir->input_dev);
+	if (cir)
+		kfree(cir);
 	return ret;
 }
 
@@ -416,76 +362,32 @@ static int __devexit cir_remove(struct platform_device *pdev)
 	cir = platform_get_drvdata(pdev);
 	if (cir == NULL)
 		return -ENODEV;
+
+	if (cir->irq > 0)
+		free_irq(cir->irq, cir);
+
+	if (cir->input_dev)
+		input_unregister_device(cir->input_dev);
+
 	kfree(cir);
 	return 0;
-}
-
-static int __devinit aspenite_cir_probe(struct platform_device *pdev)
-{
-	return cir_probe(pdev);
 }
 
 static struct platform_driver aspenite_cir_driver = {
 	.driver		= {
 		.name	= "aspenite-cir",
+		.owner  = THIS_MODULE,
 	},
-	.probe		= aspenite_cir_probe,
+	.probe		= cir_probe,
 	.remove		= __devexit_p(cir_remove),
 	.suspend	= cir_suspend,
 	.resume		= cir_resume,
 };
 
-/**
- * cir_init - setup the cir port
- *
- * initialise  cir.
- *
- */
-
-int __init cir_init(struct cir_dev *dev)
-{
-	if (gpio_request(IR_PIN, "IR_PIN")) {
-		printk(KERN_ERR "Request GPIO failed,"
-				"gpio: %d \n", IR_PIN);
-		return -EIO;
-	}
-
-/* Direction is input */
-	gpio_direction_input(IR_PIN);
-	return 0;
-}
-
-
-/**
- * cir_exit
- *
- * exit cir driver.
- *
- */
-
-void cir_exit(struct cir_dev *dev)
-{
-
-	cir_disable(dev);
-	
-/* Unregister from the input subsystem */
-	input_unregister_device(cir_input_dev);
-
-/* Unregister driver */
-	platform_device_unregister(cir_dev_in);
-return;
-}
 
 static int __init aspenite_cir_init(void)
 {
-	int ret = 0;
-	ret = platform_driver_register(&aspenite_cir_driver);
-	if (ret) {
-		printk(KERN_DEBUG   KERN_ERR "failed to register \
-			 aspenite_cir_driver");
-		return ret;
-	}
-	return ret;
+	return platform_driver_register(&aspenite_cir_driver);
 }
 
 static void __exit aspenite_cir_exit(void)
@@ -493,5 +395,5 @@ static void __exit aspenite_cir_exit(void)
 	platform_driver_unregister(&aspenite_cir_driver);
 }
 
-late_initcall(aspenite_cir_init);
+module_init(aspenite_cir_init);
 module_exit(aspenite_cir_exit);

@@ -32,27 +32,27 @@
  */
 #define GAPMASK0	(0x9C)  /* BW GPIO unmask Register GPIO<31:0> */
 #define GCPMASK0	(0xA8)  /* BW GPIO mask Register GPIO<31:0> */
+#define GSRER0		(0x6C)  /* GPIO set rising edge register */
+#define GSFER0		(0x84)  /* GPIO set rising edge register */
 
 /* More handy macros.  The argument is a literal GPIO number. */
  
-/*
- * Infrared pin definition
- */
-#define IR_PIN		ir_pin /* GPIO pin number */
-#define IR_SHIFT	(IR_PIN % (sizeof(int) * 8)) /* Shift6*/
-#define GPIO_BIT(x)	(1 << ((x) & 0x1f))
 
 typedef struct {
 	unsigned int ir_encode;
 	unsigned int ir_key;
 } ir_key_table_t;
 
+struct lirc_driver;
+
 struct cir_device {
-	struct platform_device *pdev;
-	struct input_dev *input_dev;
-	void __iomem	*mmio_base;
-	unsigned long	phys_base;
-	int		irq;
+	struct platform_device	*pdev;
+	struct lirc_driver	*lirc_driver;
+	struct input_dev	*input_dev;
+	void __iomem		*mmio_base;
+	unsigned long		 phys_base;
+	int			 irq;
+	int			 pin;
 };
 
 struct cir_dev {
