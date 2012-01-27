@@ -30,6 +30,7 @@
 
 #include <linux/spi/spi.h>
 #include <linux/spi/flash.h>
+#define DEBUG
 
 /* Flash opcodes. */
 #define	OPCODE_WREN		0x06	/* Write enable */
@@ -59,13 +60,8 @@
 #define	SR_SRWD			0x80	/* SR write protect */
 
 /* Define max times to check status register before we give up. */
-<<<<<<< HEAD:drivers/mtd/devices/m25p80.c
-#define	MAX_READY_WAIT_JIFFIES	(160 * HZ)	/* M25P64 specs 160s max chip erase */
-#define	CMD_SIZE		4
-=======
 #define	MAX_READY_WAIT_JIFFIES	(40 * HZ)	/* M25P16 specs 40s max chip erase */
 #define	MAX_CMD_SIZE		4
->>>>>>> e40152ee1e1c7a63f4777791863215e3faa37a86:drivers/mtd/devices/m25p80.c
 
 #ifdef CONFIG_M25PXX_USE_FAST_READ
 #define OPCODE_READ 	OPCODE_FAST_READ
@@ -655,9 +651,9 @@ static const struct spi_device_id m25p_ids[] = {
 	{ "mx25l12855e", INFO(0xc22618, 0, 64 * 1024, 256, 0) },
 
 	/* Macronix -- mx25lxxx */
-	{ "mx25l32",  0xc22016, 0, 64 * 1024,  64, },
-	{ "mx25l64",  0xc22017, 0, 64 * 1024, 128, },
-	{ "mx25l128", 0xc22018, 0, 64 * 1024, 256, },
+	{ "mx25l32",  INFO(0xc22016, 0, 64 * 1024,  64, 0) },
+	{ "mx25l64",  INFO(0xc22017, 0, 64 * 1024, 128, 0) },
+	{ "mx25l128", INFO(0xc22018, 0, 64 * 1024, 256, 0) },
 
 	/* Spansion -- single (large) sector size only, at least
 	 * for the chips listed here (without boot sectors).
@@ -683,24 +679,6 @@ static const struct spi_device_id m25p_ids[] = {
 	{ "sst25wf040",  INFO(0xbf2504, 0, 64 * 1024,  8, SECT_4K) },
 
 	/* ST Microelectronics -- newer production may have feature updates */
-<<<<<<< HEAD:drivers/mtd/devices/m25p80.c
-	{ "m25p05",  0x202010,  0, 32 * 1024, 2, },
-	{ "m25p10",  0x202011,  0, 32 * 1024, 4, },
-	{ "m25p20",  0x202012,  0, 64 * 1024, 4, },
-	{ "m25p40",  0x202013,  0, 64 * 1024, 8, },
-	{ "m25p80",         0,  0, 64 * 1024, 16, },
-	{ "m25p16",  0x202015,  0, 64 * 1024, 32, },
-	{ "m25p32",  0x202016,  0, 64 * 1024, 64, },
-	{ "m25p64",  0x202017,  0, 64 * 1024, 128, },
-	{ "m25px64", 0x207117,  0, 64 * 1024, 128, },
-	{ "m25p128", 0x202018, 0, 256 * 1024, 64, },
-
-	{ "m45pe80", 0x204014,  0, 64 * 1024, 16, },
-	{ "m45pe16", 0x204015,  0, 64 * 1024, 32, },
-
-	{ "m25pe80", 0x208014,  0, 64 * 1024, 16, },
-	{ "m25pe16", 0x208015,  0, 64 * 1024, 32, SECT_4K, },
-=======
 	{ "m25p05",  INFO(0x202010,  0,  32 * 1024,   2, 0) },
 	{ "m25p10",  INFO(0x202011,  0,  32 * 1024,   4, 0) },
 	{ "m25p20",  INFO(0x202012,  0,  64 * 1024,   4, 0) },
@@ -717,7 +695,6 @@ static const struct spi_device_id m25p_ids[] = {
 
 	{ "m25pe80", INFO(0x208014,  0, 64 * 1024, 16,       0) },
 	{ "m25pe16", INFO(0x208015,  0, 64 * 1024, 32, SECT_4K) },
->>>>>>> e40152ee1e1c7a63f4777791863215e3faa37a86:drivers/mtd/devices/m25p80.c
 
 	/* Winbond -- w25x "blocks" are 64K, "sectors" are 4KiB */
 	{ "w25x10", INFO(0xef3011, 0, 64 * 1024,  2,  SECT_4K) },
@@ -847,11 +824,7 @@ static int __devinit m25p_probe(struct spi_device *spi)
 	flash = kzalloc(sizeof *flash, GFP_KERNEL);
 	if (!flash)
 		return -ENOMEM;
-<<<<<<< HEAD:drivers/mtd/devices/m25p80.c
-	flash->command = kmalloc(CMD_SIZE + FAST_READ_DUMMY_BYTE, GFP_KERNEL);
-=======
 	flash->command = kmalloc(MAX_CMD_SIZE + FAST_READ_DUMMY_BYTE, GFP_KERNEL);
->>>>>>> e40152ee1e1c7a63f4777791863215e3faa37a86:drivers/mtd/devices/m25p80.c
 	if (!flash->command) {
 		kfree(flash);
 		return -ENOMEM;
