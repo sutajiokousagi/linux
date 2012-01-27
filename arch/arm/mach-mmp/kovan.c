@@ -550,7 +550,21 @@ static struct i2c_pxa_platform_data pwri2c_info __initdata = {
 
 static struct fb_videomode video_modes_aspen[] = {
 	/* lpj032l001b HVGA mode info */
-	[0] = {
+        [0] = {
+                .pixclock       = 16129,
+                .refresh        = 60,
+                .xres           = 1280,
+                .yres           = 720,
+                .hsync_len      = 40,
+                .left_margin    = 220,
+                .right_margin   = 110,
+                .vsync_len      = 5,
+                .upper_margin   = 20,
+                .lower_margin   = 5,
+                .sync           = 0, 
+        },
+
+	[1] = {
 		.pixclock       = 30120,
 		.refresh        = 60,
 		.xres           = 800,
@@ -564,7 +578,7 @@ static struct fb_videomode video_modes_aspen[] = {
 		.sync           = FB_SYNC_VERT_HIGH_ACT | FB_SYNC_HOR_HIGH_ACT,
 	},
 
-        [1] = {
+        [2] = {
                 .pixclock       = 16129,
                 .refresh        = 60,
                 .xres           = 1024,
@@ -578,7 +592,7 @@ static struct fb_videomode video_modes_aspen[] = {
                 .sync           = 0, 
         },
 
-        [2] = {
+        [3] = {
                 .pixclock       = 25641,
                 .refresh        = 60,
                 .xres           = 800,
@@ -592,7 +606,7 @@ static struct fb_videomode video_modes_aspen[] = {
                 .sync           = 0, 
         },
 
-        [3] = {
+        [4] = {
                 .pixclock       = 111111,
                 .refresh        = 60,
                 .xres           = 480,
@@ -603,20 +617,6 @@ static struct fb_videomode video_modes_aspen[] = {
                 .vsync_len      = 1,
                 .upper_margin   = 12,
                 .lower_margin   = 2,
-                .sync           = 0, 
-        },
-
-        [4] = {
-                .pixclock       = 16129,
-                .refresh        = 60,
-                .xres           = 1280,
-                .yres           = 720,
-                .hsync_len      = 40,
-                .left_margin    = 220,
-                .right_margin   = 110,
-                .vsync_len      = 5,
-                .upper_margin   = 20,
-                .lower_margin   = 5,
                 .sync           = 0, 
         },
 
@@ -828,7 +828,7 @@ static struct spi_board_info __initdata spi_board_info[] = {
 
 static void __init kovan_init_spi(void)
 {
-	pxa168_add_ssp(1);
+	//pxa168_add_ssp(1);
 	pxa168_add_spi(2, &pxa_ssp_master_info);
 	spi_register_board_info(spi_board_info, ARRAY_SIZE(spi_board_info));
 }
@@ -1001,6 +1001,7 @@ static void __init kovan_init(void)
 #if defined(CONFIG_BATTERY_ASPENITE)
 	kovan_add_battery();
 #endif
+	pxa168_add_rtc(&pxa910_device_rtc);
 
 }
 
