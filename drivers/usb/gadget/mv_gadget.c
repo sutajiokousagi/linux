@@ -273,7 +273,7 @@ static int mv_usb_vbus_detect(void *func, int enable)
 
 	if (enable) {
 		ret = request_irq(irq, (irq_handler_t)mv_usb_vbus_event,
-			IRQF_DISABLED | IRQF_SHARED, "vbus", func);
+			IRQF_SHARED, "vbus", func);
 		if (ret)
 			printk(KERN_INFO "request irq vbus %d failed: %d\n",
 				irq, ret);
@@ -1520,7 +1520,7 @@ int usb_gadget_register_driver (struct usb_gadget_driver *driver)
 
     if (mv_dev->cdev.driver_count == 1) {
         /* request_irq */
-		if (request_irq (IRQ_USB_CTRL[dev_no], mv_usb_dev_irq, IRQF_DISABLED | IRQF_SHARED, 
+		if (request_irq (IRQ_USB_CTRL[dev_no], mv_usb_dev_irq, IRQF_SHARED, 
                          driver_name, mv_dev) != 0) 
         {
             mvOsPrintf("%s register: request interrupt %d failed\n", 
@@ -2475,7 +2475,7 @@ static int __init mv_usb_gadget_probe(struct platform_device *_dev)
 
     if(mv_dev->vbus_gpp_no != (MV_U8)N_A)
     {
-        if (request_irq (IRQ_GPP_START + mv_dev->vbus_gpp_no, mv_usb_vbus_irq, IRQF_DISABLED, 
+        if (request_irq (IRQ_GPP_START + mv_dev->vbus_gpp_no, mv_usb_vbus_irq, 0, 
                      driver_name, mv_dev) != 0) 
         {
             mvOsPrintf("%s probe: request interrupt %d failed\n", 
