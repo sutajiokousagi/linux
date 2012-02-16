@@ -4,8 +4,8 @@
 
 menu "Character devices"
 
-config CHUMBY_XILINX
-       tristate "Chumby xilinx fpga configuration driver"
+config KOVAN_XILINX
+       tristate "Kovan xilinx fpga configuration driver"
        depends on (MACH_CHUMBY_SILVERMOON || MACH_KOVAN)
        default m
        ---help---

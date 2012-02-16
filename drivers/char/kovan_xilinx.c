@@ -34,7 +34,7 @@
 
 #include <linux/platform_device.h>
 #include <linux/mutex.h>
-#include "chumby_xilinx.h"
+#include "kovan_xilinx.h"
 #include <mach/mfp-pxa168.h>
 #include <mach/regs-apbc.h>
 #include <mach/gpio.h>
@@ -286,7 +286,7 @@ int fpga_ioctl(struct inode *inode, struct file *filp,
 		break;
 
 	case FPGA_IOCRESET:
-	  printk( "chumby_xilinx ioctl: Resetting FPGA\n" );
+	  printk( "kovan_xilinx ioctl: Resetting FPGA\n" );
 	  gpio_direction_output(119,1);
 	  gpio_set_value(119,0); // strobe low
 	  udelay(2); // give it 2 usecs to settle
@@ -294,7 +294,7 @@ int fpga_ioctl(struct inode *inode, struct file *filp,
 	  break;
 	  
 	case FPGA_IOCLED0:
-	  PDEBUG( "chumby_xilinx ioctl: led0 %d\n", arg );
+	  PDEBUG( "kovan_xilinx ioctl: led0 %d\n", arg );
 	  if(arg) {
 	    gpio_set_value(45, 0);
 	  } else {
@@ -303,7 +303,7 @@ int fpga_ioctl(struct inode *inode, struct file *filp,
 	  break;
         
 	case FPGA_IOCLED1:
-	  PDEBUG( "chumby_xilinx ioctl: led1 %d\n", arg );
+	  PDEBUG( "kovan_xilinx ioctl: led1 %d\n", arg );
 	  if(arg) {
 	    gpio_set_value(46, 0);
 	  } else {
@@ -627,7 +627,7 @@ module_init(fpga_init_module);
 module_exit(fpga_cleanup_module);
 
 
-MODULE_AUTHOR("bunnie <bunnie@chumby.com>");
-MODULE_DESCRIPTION("chumby Silvermoon NeTV FPGA driver");
+MODULE_AUTHOR("bunnie <bunnie@kosagi.com>");
+MODULE_DESCRIPTION("Kovan Silvermoon NeTV FPGA driver");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("platform:silvermoon-fpga");
