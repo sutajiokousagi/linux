@@ -51,13 +51,11 @@ static void warn_no_thread(unsigned int irq, struct irqaction *action)
 	       "but no thread function available.", irq, action->name);
 }
 
-static irqreturn_t __handle_irq_event(unsigned int irq, struct irqaction *action)
+irqreturn_t
+handle_irq_event_percpu(struct irq_desc *desc, struct irqaction *action)
 {
 	irqreturn_t ret, retval = IRQ_NONE;
-	unsigned int status = 0;
-
-	if (!(action->flags & IRQF_DISABLED))
-		local_irq_enable_in_hardirq();
+	unsigned int status = 0, irq = desc->irq_data.irq;
 
 	do {
 		trace_irq_handler_entry(irq, action);
@@ -114,127 +112,9 @@ static irqreturn_t __handle_irq_event(unsigned int irq, struct irqaction *action
 	if (status & IRQF_SAMPLE_RANDOM)
 		add_interrupt_randomness(irq);
 
-	return retval;
-}
-
-#ifndef CONFIG_GENERIC_HARDIRQS_NO__DO_IRQ
-
-#ifdef CONFIG_ENABLE_WARN_DEPRECATED
-# warning __do_IRQ is deprecated. Please convert to proper flow handlers
-#endif
-
-/**
- * __do_IRQ - original all in one highlevel IRQ handler
- * @irq:	the interrupt number
- *
- * __do_IRQ handles all normal device IRQ's (the special
- * SMP cross-CPU interrupts have their own specific
- * handlers).
- *
- * This is the original x86 implementation which is used for every
- * interrupt type.
- */
-unsigned int __do_IRQ(unsigned int irq)
-{
-	struct irq_desc *desc = irq_to_desc(irq);
-	struct irqaction *action;
-	unsigned int status;
-
-	kstat_incr_irqs_this_cpu(irq, desc);
-
-	if (CHECK_IRQ_PER_CPU(desc->status)) {
-		irqreturn_t action_ret;
-
-		/*
-		 * No locking required for CPU-local interrupts:
-		 */
-		if (desc->irq_data.chip->ack)
-			desc->irq_data.chip->ack(irq);
-		if (likely(!(desc->status & IRQ_DISABLED))) {
-			action_ret = handle_IRQ_event(irq, desc->action);
-			if (!noirqdebug)
-				note_interrupt(irq, desc, action_ret);
-		}
-		desc->irq_data.chip->end(irq);
-		return 1;
-	}
-
-	raw_spin_lock(&desc->lock);
-	if (desc->irq_data.chip->ack)
-		desc->irq_data.chip->ack(irq);
-	/*
-	 * REPLAY is when Linux resends an IRQ that was dropped earlier
-	 * WAITING is used by probe to mark irqs that are being tested
-	 */
-	status = desc->status & ~(IRQ_REPLAY | IRQ_WAITING);
-	status |= IRQ_PENDING; /* we _want_ to handle it */
-
-	/*
-	 * If the IRQ is disabled for whatever reason, we cannot
-	 * use the action we have.
-	 */
-	action = NULL;
-	if (likely(!(status & (IRQ_DISABLED | IRQ_INPROGRESS)))) {
-		action = desc->action;
-		status &= ~IRQ_PENDING; /* we commit to handling */
-		status |= IRQ_INPROGRESS; /* we are handling it */
-	}
-	desc->status = status;
-
-	/*
-	 * If there is no IRQ handler or it was disabled, exit early.
-	 * Since we set PENDING, if another processor is handling
-	 * a different instance of this same irq, the other processor
-	 * will take care of it.
-	 */
-	if (unlikely(!action))
-		goto out;
-
-	/*
-	 * Edge triggered interrupts need to remember
-	 * pending events.
-	 * This applies to any hw interrupts that allow a second
-	 * instance of the same irq to arrive while we are in do_IRQ
-	 * or in the handler. But the code here only handles the _second_
-	 * instance of the irq, not the third or fourth. So it is mostly
-	 * useful for irq hardware that does not mask cleanly in an
-	 * SMP environment.
-	 */
-	for (;;) {
-		irqreturn_t action_ret;
-
-		raw_spin_unlock(&desc->lock);
-
-		action_ret = handle_IRQ_event(irq, action);
-		if (!noirqdebug)
-			note_interrupt(irq, desc, action_ret);
-
-		raw_spin_lock(&desc->lock);
-		if (likely(!(desc->status & IRQ_PENDING)))
-			break;
-		desc->status &= ~IRQ_PENDING;
-	}
-	desc->status &= ~IRQ_INPROGRESS;
-
-out:
-	/*
-	 * The ->end() handler has to deal with interrupts which got
-	 * disabled while the handler was running.
-	 */
-	desc->irq_data.chip->end(irq);
-	raw_spin_unlock(&desc->lock);
-
-	return 1;
-}
-#endif
-irqreturn_t
-handle_irq_event_percpu(struct irq_desc *desc, struct irqaction *action)
-{
-	irqreturn_t ret = __handle_irq_event(desc->irq_data.irq, action);
-
 	if (!noirqdebug)
-		note_interrupt(desc->irq_data.irq, desc, ret);
-	return ret;
+		note_interrupt(irq, desc, ret);
+	return retval;
 }
 
 irqreturn_t handle_irq_event(struct irq_desc *desc)
@@ -262,5 +142,5 @@ irqreturn_t handle_irq_event(struct irq_desc *desc)
  */
 irqreturn_t handle_IRQ_event(unsigned int irq, struct irqaction *action)
 {
-	return __handle_irq_event(irq, action);
+	return handle_irq_event_percpu(irq_to_desc(irq), action);
 }
