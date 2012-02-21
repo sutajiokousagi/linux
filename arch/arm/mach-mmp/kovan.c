@@ -20,6 +20,7 @@
 #include <linux/mtd/partitions.h>
 #include <linux/delay.h>
 #include <linux/usb/otg.h>
+#include <linux/mfd/stmpe.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -175,7 +176,6 @@ static unsigned long kovan_pin_config[] __initdata = {
 	MFP_CFG(GPIO96, AF1),
 	#endif
 
-	/* Touchscreen */
 	//CSM_GPIO118_TS_SCLK,
 	MFP_CFG(GPIO119, AF0), // fpga_reset_n (output)
 	MFP_CFG(GPIO120, AF0), // fpga_init_n (input, mostly)
@@ -185,21 +185,15 @@ static unsigned long kovan_pin_config[] __initdata = {
 	/* Recovery button */
 	MFP_CFG(GPIO89, AF0),
 
-	/* Media insert detect */
-	//CSM_GPIO100_SDCDN, // input, USB overcurrent
-	MFP_CFG(GPIO101, AF0),  // output, USB_PWR_EN
-	//CSM_GPIO102_MSINS, // which is properly a GPIO for use as IR remote
-	//CSM_GPIO103_CFCDN,
-
-	//CSM_GPIO105_Xi2cSDA,
-	//CSM_GPIO106_Xi2cSCL,
-
 	/* vsync input */
 	MFP_CFG(GPIO49, AF0),
 
 	/* LED outputs */
 	MFP_CFG(GPIO45, AF0),
 	MFP_CFG(GPIO46, AF0),
+
+	/* Touchscreen */
+	MFP_CFG(GPIO52, AF0),
 };
 
 struct platform_device kovan_device_battery = {
@@ -215,6 +209,29 @@ static inline void kovan_add_battery(void)
 		dev_err(&kovan_device_battery.dev,
 			"unable to register device: %d\n", ret);
 }
+
+/*
+ * STMPE610
+ */
+static struct stmpe_ts_platform_data stmpe610_ts_data = {
+	.sample_time = 4,	/* 80 clocks */
+	.mod_12b = 0,		/* 10-bit mode */
+	.ref_sel = 0,		/* Internal reference */
+	.touch_det_delay = 3,	/* 500 uS */
+	.settling = 2,		/* 500 uS settling time */
+	.fraction_z = 7,	/* Length of the fractional part */
+	.i_drive = 0,		/* 20 mA drive */
+};
+
+static struct stmpe_platform_data stmpe610_data = {
+	.id		= 1,
+	.blocks		= STMPE_BLOCK_TOUCHSCREEN,
+	.irq_trigger	= IRQF_TRIGGER_FALLING,
+	.irq_gpio	= 52,
+	.irq_over_gpio	= true,
+	.ts		= &stmpe610_ts_data,
+};
+
 
 
 #if defined(CONFIG_PCI)
@@ -707,6 +724,13 @@ static struct i2c_board_info kovan_i2c_board_info[] = {
 #endif
 };
 
+static struct i2c_board_info pwr_i2c_board_info[] = {
+	{
+		I2C_BOARD_INFO("stmpe610", 0x44),
+		.platform_data = &stmpe610_data,
+	},
+};
+
 
 static unsigned int kovan_matrix_key_map[] = {
 	KEY(0, 7, KEY_LEFT),
@@ -874,6 +898,8 @@ static struct pxa_usb_plat_info kovan_u2h_info = {
 };
 #endif
 
+
+
 static void __init kovan_init(void)
 {
 	mfp_config(ARRAY_AND_SIZE(kovan_pin_config));
@@ -891,7 +917,7 @@ static void __init kovan_init(void)
 
 	pxa168_add_ssp(0);
 	pxa168_add_twsi(0, &pwri2c_info, ARRAY_AND_SIZE(kovan_i2c_board_info));
-	pxa168_add_twsi(1, &pwri2c_info, ARRAY_AND_SIZE(pwri2c_board_info));
+	pxa168_add_twsi(1, &pwri2c_info, ARRAY_AND_SIZE(pwr_i2c_board_info));
 	if (is_android())
 		pxa168_add_keypad(&kovan_android_keypad_info);
 	else
