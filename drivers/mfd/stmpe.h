@@ -11,7 +11,6 @@
 #include <linux/device.h>
 #include <linux/mfd/core.h>
 #include <linux/mfd/stmpe.h>
-#include <linux/printk.h>
 #include <linux/types.h>
 
 extern const struct dev_pm_ops stmpe_dev_pm_ops;
