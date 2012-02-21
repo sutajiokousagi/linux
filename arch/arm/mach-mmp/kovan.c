@@ -707,62 +707,6 @@ static struct i2c_board_info kovan_i2c_board_info[] = {
 #endif
 };
 
-#if defined(CONFIG_MAX8660)
-static void max8660_init(void)
-{
-        /* There was 0.2 voltage decline on V3 according to the spec setting, the real voltage is 1.1v;
-	 * use hardware default value on aspenite to high voltage damage the board;
-	 * pxa3xx_pmic_set_voltage(VCC_CORE, 1300); 
-	 */
-	pxa3xx_pmic_set_voltage(HDMI_1P2V, 1200);
-	pxa3xx_pmic_set_voltage(VCC_MVT, 1800);
-	pxa3xx_pmic_set_voltage(VCC_MISC1, 3000); 	/* SD voltage */
-	pxa3xx_pmic_set_voltage(VCC_MISC2, 1800);	/* Backlight control */
-}
-
-/* max8660_power_module[] should be consistent with enum
- * in include/asm-arm/arch-pxa/pxa3xx_pmic.h 
- */
-static struct power_supply_module max8660_power_modules[] = {
-        /* {command,            power_module}, */
-        {VCC_CORE,              MAX8660_V3},
-        {HDMI_1P2V,             MAX8660_V4},
-        {VCC_MVT,               MAX8660_V5},
-        {VCC_MISC1,             MAX8660_V6},
-        {VCC_MISC2,           	MAX8660_V7},
-        {0,                     0},
-};
-
-static struct power_chip max8660_chips[] = {
-        {MAX8660_ID,  "max8660",      max8660_power_modules},
-        {0,     NULL,           NULL},
-};
-
-static struct max8660_platform_data max8660_data = {
-        .platform_init = max8660_init,
-        .power_chips = max8660_chips,
-};
-#endif
-
-static struct i2c_board_info pwri2c_board_info[] =
-{
-#if defined(CONFIG_MAX8660)
-	{
-		.type	= "max8660",
-		.addr	= 0x34,
-		.platform_data = &max8660_data,
-	},
-#endif
-
-#if defined(CONFIG_TSC2007)
-       {
-	       .type	= "tsc2007",
-	       .addr	= 0x48,                                 /* 0x90/0x91 */
-	       .irq	= IRQ_GPIO(GPIO_EXT0(7)),               /* IO7 of TSC2007 */
-       },
-#endif
-
-};
 
 static unsigned int kovan_matrix_key_map[] = {
 	KEY(0, 7, KEY_LEFT),
