@@ -891,21 +891,9 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 		if (new->flags & IRQF_ONESHOT)
 			desc->status |= IRQ_ONESHOT;
 
-		/*
-		 * Force MSI interrupts to run with interrupts
-		 * disabled. The multi vector cards can cause stack
-		 * overflows due to nested interrupts when enough of
-		 * them are directed to a core and fire at the same
-		 * time.
-		 */
-		if (desc->msi_desc)
-			new->flags |= IRQF_DISABLED;
-
-		if (!(desc->status & IRQ_NOAUTOEN)) {
-			desc->depth = 0;
-			desc->status &= ~IRQ_DISABLED;
-			desc->irq_data.chip->irq_startup(&desc->irq_data);
-		} else
+		if (!(desc->status & IRQ_NOAUTOEN))
+			irq_startup(desc);
+		else
 			/* Undo nested disables: */
 			desc->depth = 1;
 
@@ -1045,10 +1033,8 @@ static struct irqaction *__free_irq(unsigned int irq, void *dev_id)
 #endif
 
 	/* If this was the last handler, shut down the IRQ line: */
-	if (!desc->action) {
-		desc->status |= IRQ_DISABLED;
-		desc->irq_data.chip->irq_shutdown(&desc->irq_data);
-	}
+	if (!desc->action)
+		irq_shutdown(desc);
 
 #ifdef CONFIG_SMP
 	/* make sure affinity_hint is cleaned up */
