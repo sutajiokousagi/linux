@@ -64,17 +64,15 @@
 #define IRQF_ONESHOT		0x00002000
 
 /*
- * Bits used by threaded handlers:
- * IRQTF_RUNTHREAD - signals that the interrupt handler thread should run
- * IRQTF_DIED      - handler thread died
- * IRQTF_WARNED    - warning "IRQ_WAKE_THREAD w/o thread_fn" has been printed
- * IRQTF_AFFINITY  - irq thread is requested to adjust affinity
+ * These values can be returned by request_any_context_irq() and
+ * describe the context the interrupt will be run in.
+ *
+ * IRQC_IS_HARDIRQ - interrupt runs in hardirq context
+ * IRQC_IS_NESTED - interrupt runs in a nested threaded context
  */
 enum {
-	IRQTF_RUNTHREAD,
-	IRQTF_DIED,
-	IRQTF_WARNED,
-	IRQTF_AFFINITY,
+	IRQC_IS_HARDIRQ	= 0,
+	IRQC_IS_NESTED,
 };
 
 typedef irqreturn_t (*irq_handler_t)(int, void *);
