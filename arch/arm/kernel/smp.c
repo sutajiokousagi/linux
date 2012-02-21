@@ -373,16 +373,16 @@ void arch_send_call_function_single_ipi(int cpu)
 	send_ipi_message(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
 }
 
-void show_ipi_list(struct seq_file *p)
+void show_ipi_list(struct seq_file *p, int prec)
 {
 	unsigned int cpu;
 
-	seq_puts(p, "IPI:");
+	seq_printf(p, "%*s: ", prec, "IPI");
 
 	for_each_present_cpu(cpu)
-		seq_printf(p, " %10lu", per_cpu(ipi_data, cpu).ipi_count);
+		seq_printf(p, "%10u ", __get_irq_stat(cpu, ipi_irqs));
 
-	seq_putc(p, '\n');
+	seq_printf(p, " Inter-processor interrupts\n");
 }
 
 /*
@@ -412,16 +412,16 @@ asmlinkage void __exception_irq_entry do_local_timer(struct pt_regs *regs)
 	set_irq_regs(old_regs);
 }
 
-void show_local_irqs(struct seq_file *p)
+void show_local_irqs(struct seq_file *p, int prec)
 {
 	unsigned int cpu;
 
-	seq_printf(p, "LOC: ");
+	seq_printf(p, "%*s: ", prec, "LOC");
 
 	for_each_present_cpu(cpu)
 		seq_printf(p, "%10u ", irq_stat[cpu].local_timer_irqs);
 
-	seq_putc(p, '\n');
+	seq_printf(p, " Local timer interrupts\n");
 }
 #endif
 
