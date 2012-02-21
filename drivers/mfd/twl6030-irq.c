@@ -188,7 +188,7 @@ static inline void activate_irq(int irq)
 	set_irq_flags(irq, IRQF_VALID);
 #else
 	/* same effect on other architectures */
-	set_irq_noprobe(irq);
+	irq_set_noprobe(irq);
 #endif
 }
 
@@ -253,8 +253,8 @@ int twl6030_init_irq(int irq_num, unsigned irq_base, unsigned irq_end)
 	twl6030_irq_chip.set_type = NULL;
 
 	for (i = irq_base; i < irq_end; i++) {
-		set_irq_chip_and_handler(i, &twl6030_irq_chip,
-				handle_simple_irq);
+		irq_set_chip_and_handler(i, &twl6030_irq_chip,
+					 handle_simple_irq);
 		activate_irq(i);
 	}
 
@@ -283,7 +283,7 @@ fail_irq:
 
 fail_kthread:
 	for (i = irq_base; i < irq_end; i++)
-		set_irq_chip_and_handler(i, NULL, NULL);
+		irq_set_chip_and_handler(i, NULL, NULL);
 	return status;
 }
 
