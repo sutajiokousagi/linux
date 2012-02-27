@@ -21,6 +21,8 @@
 #include <linux/delay.h>
 #include <linux/usb/otg.h>
 #include <linux/mfd/stmpe.h>
+#include <linux/leds_pwm.h>
+#include <linux/pwm_backlight.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -126,6 +128,9 @@ static unsigned long kovan_pin_config[] __initdata = {
 	/* Status LED */
 	MFP_CFG(GPIO96, AF1),
 
+	/* LCD backlight */
+	GPIO84_PWM1_OUT,
+
 	/* FPGA programming GPIOs */
 	MFP_CFG(GPIO119, AF0), // fpga_reset_n (output)
 	MFP_CFG(GPIO120, AF0), // fpga_init_n (input, mostly)
@@ -168,6 +173,33 @@ static struct stmpe_platform_data stmpe610_data = {
 	.irq_gpio	= 52,
 	.irq_over_gpio	= true,
 	.ts		= &stmpe610_ts_data,
+};
+
+
+/*
+ * PWM green LED
+ */
+static struct led_pwm kovan_pwm_leds[] = {
+	{
+		.name			= "kovan:green:state",
+		.default_trigger	= "heartbeat",
+		.pwm_id			= 2,
+		.max_brightness		= 100,
+		.pwm_period_ns		= 10000,
+	},
+};
+
+static struct led_pwm_platform_data kovan_pwm_leds_platform_data = {
+	.leds		= kovan_pwm_leds,
+	.num_leds	= ARRAY_SIZE(kovan_pwm_leds),
+};
+
+static struct platform_device kovan_leds_device = {
+	.name	= "leds_pwm",
+	.id	= -1,
+	.dev	= {
+		.platform_data	= &kovan_pwm_leds_platform_data,
+	},
 };
 
 
@@ -411,6 +443,23 @@ static struct pxa_usb_plat_info kovan_u2h_info = {
 };
 
 
+static struct platform_pwm_backlight_data kovan_backlight_data = {
+	.pwm_id		= 0,
+	.max_brightness	= 100,
+	.dft_brightness	= 100,
+	.pwm_period_ns	= 10000,
+};
+
+static struct platform_device kovan_backlight_device = {
+	.name		= "pwm-backlight",
+	.dev		= {
+		.parent		= &pxa168_device_pwm0.dev,
+		.platform_data	= &kovan_backlight_data,
+	},
+};
+
+
+
 
 static void __init kovan_init(void)
 {
@@ -466,6 +515,13 @@ static void __init kovan_init(void)
 
 	pxa168_add_rtc(&pxa910_device_rtc);
 
+	/* Add the power state LED */
+	platform_device_register(&pxa168_device_pwm2);
+	platform_device_register(&kovan_leds_device);
+
+	/* Add the LCD backlight */
+	platform_device_register(&pxa168_device_pwm0);
+	platform_device_register(&kovan_backlight_device);
 }
 
 MACHINE_START(KOVAN, "PXA168-based Kovan Platform")
