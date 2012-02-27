@@ -196,19 +196,7 @@ static unsigned long kovan_pin_config[] __initdata = {
 	MFP_CFG(GPIO52, AF0),
 };
 
-struct platform_device kovan_device_battery = {
-	.name		= "kovan-battery",
-	.id		= -1,
-};
 
-static inline void kovan_add_battery(void)
-{
-	int ret;
-        ret = platform_device_register(&kovan_device_battery);
-	if (ret)
-		dev_err(&kovan_device_battery.dev,
-			"unable to register device: %d\n", ret);
-}
 
 /*
  * STMPE610
@@ -234,335 +222,6 @@ static struct stmpe_platform_data stmpe610_data = {
 
 
 
-#if defined(CONFIG_PCI)
-
-
-
-/* #define ASPENITE_REV5 */
-#if !defined(ASPENITE_REV5)
-
-#define PCIE_MINICARD_CD_N      GPIO_EXT2(0)
-#define PCIE_1P5V_SHDN_N        GPIO_EXT2(1)
-#define PCIE_3P3V_SHDN_N        GPIO_EXT2(2)
-#define PCIE_MINICARD_PERST_N   GPIO_EXT2(3)
-#define PCIE_MINICARD_WAKE_N    GPIO_EXT2(4)
-#define PCIE_MINICARD_CLKREQ_N  GPIO_EXT2(5)
-#define PCIE_REFCLK_OE          GPIO_EXT2(6)
-
-#define PCIE_CARD_DECTECT       GPIO_EXT2(0)
-
-
-static unsigned int pcie_card_inserted(void)
-{
-	int ret = 0;
-	int res;
-
-	res = gpio_get_value_cansleep(PCIE_CARD_DECTECT);
-	if (!(res < 0)) {
-
-		/*
-		 * Check input reg (0x00) bit 0
-		 *    0 = card is inserted
-		 *    1 = card is not inserted
-		 */
-		ret = !res;
-	}
-
-	return ret;
-}
-
-int pxa168_gpio_pcie_init(void)
-{
-	/* Card inserted? */
-	if (!pcie_card_inserted()) {
-		printk(KERN_ERR "pcie: No card detected.\n");
-		return -EIO;
-	}
-
-	if (gpio_request(PCIE_1P5V_SHDN_N, "PCIE_1P5V_SHDN_N")) {
-		printk(KERN_ERR "Request GPIO failed,"
-				"gpio: %d \n", PCIE_1P5V_SHDN_N);
-		return -EIO;
-	}
-
-	if (gpio_request(PCIE_3P3V_SHDN_N, "PCIE_3P3V_SHDN_N")) {
-		gpio_free(PCIE_1P5V_SHDN_N);
-		printk(KERN_ERR "Request GPIO failed,"
-				"gpio: %d\n", PCIE_3P3V_SHDN_N);
-		return -EIO;
-	}
-
-	if (gpio_request(PCIE_REFCLK_OE, "PCIE_REFCLK_OE")) {
-		gpio_free(PCIE_1P5V_SHDN_N);
-		gpio_free(PCIE_3P3V_SHDN_N);
-		printk(KERN_ERR "Request GPIO failed,"
-				"gpio: %d\n", PCIE_REFCLK_OE);
-		return -EIO;
-	}
-
-	if (gpio_request(PCIE_MINICARD_PERST_N, "PCIE_MINICARD_PERST_N")) {
-		gpio_free(PCIE_1P5V_SHDN_N);
-		gpio_free(PCIE_3P3V_SHDN_N);
-		gpio_free(PCIE_REFCLK_OE);
-		printk(KERN_ERR "Request GPIO failed,"
-				"gpio: %d\n", PCIE_MINICARD_PERST_N);
-		return -EIO;
-	}
-
-	if (gpio_direction_output(PCIE_MINICARD_PERST_N, 0))
-		return -EIO;
-	if (gpio_direction_output(PCIE_1P5V_SHDN_N, 1))
-		return -EIO;
-	if (gpio_direction_output(PCIE_1P5V_SHDN_N, 1))
-		return -EIO;
-	if (gpio_direction_output(PCIE_3P3V_SHDN_N, 1))
-		return -EIO;
-	/* wait for power supply to stabilize */
-	mdelay(2);
-	if (gpio_direction_output(PCIE_REFCLK_OE, 1))
-		return -EIO;
-	/* 4ms: PCIClock output to stabilize +
-	 * 96ms: Tpvperl pr PCISIG Base1.0a design checklist
-	 */
-	mdelay(100);
-	if (gpio_direction_output(PCIE_MINICARD_PERST_N, 1))
-		return -EIO;
-
-	gpio_free(PCIE_1P5V_SHDN_N);
-	gpio_free(PCIE_3P3V_SHDN_N);
-	gpio_free(PCIE_REFCLK_OE);
-	gpio_free(PCIE_MINICARD_PERST_N);
-
-	return 0;
-}
-
-#else /* Rev 5 */
-
-#define PCIE_3P3V_SHDN_N   GPIO_EXT2(2)
-#define PCIE_PRSNT2_N      GPIO_EXT2(3)
-#define PCIE_WAKE_N        GPIO_EXT2(4)
-#define PCIE_PWRGD         GPIO_EXT2(5)
-#define PCIE_REFCLK_OE     GPIO_EXT2(6)
-
-int pxa168_gpio_pcie_init(void)
-{
-
-	if (gpio_request(PCIE_3P3V_SHDN_N, "PCIE_3P3V_SHDN_N")) {
-		printk(KERN_ERR "Request GPIO failed,"
-				"gpio: %d \n", PCIE_3P3V_SHDN_N);
-		return -EIO;
-	}
-
-	if (gpio_request(PCIE_PWRGD, "PCIE_PWRGD")) {
-		gpio_free(PCIE_3P3V_SHDN_N);
-		printk(KERN_ERR "Request GPIO failed,"
-				"gpio: %d \n", PCIE_PWRGD);
-		return -EIO;
-	}
-
-	if (gpio_request(PCIE_REFCLK_OE, "PCIE_REFCLK_OE")) {
-		gpio_free(PCIE_3P3V_SHDN_N);
-		gpio_free(PCIE_PWRGD);
-		printk(KERN_ERR "Request GPIO failed,"
-				"gpio: %d\n", PCIE_REFCLK_OE);
-		return -EIO;
-	}
-
-	gpio_direction_output(PCIE_3P3V_SHDN_N, 1);
-	mdelay(2);
-	gpio_direction_output(PCIE_PWRGD, 1);
-	mdelay(2);
-	gpio_direction_output(PCIE_REFCLK_OE, 1);
-	mdelay(100);
-
-	gpio_free(PCIE_3P3V_SHDN_N);
-	gpio_free(PCIE_PWRGD);
-	gpio_free(PCIE_REFCLK_OE);
-
-	return 0;
-}
-#endif
-
-static struct pxa168_pcie_platform_data pxa168_pcie_data = {
-	.init		= pxa168_gpio_pcie_init,
-};
-#endif
-
-#if defined(CONFIG_PXA168_CF) && defined(CONFIG_PXA168_CF_USE_GPIO_CARDDETECT)
-static struct resource pxa168_cf_resources[] = {
-	[0] = {
-		.start  = 0xD4285000,
-		.end    = 0xD4285800,
-		.flags  = IORESOURCE_MEM,
-	},
-	[1] = {
-		.start  = IRQ_PXA168_CF,
-		.end    = IRQ_PXA168_CF,
-		.flags  = IORESOURCE_IRQ,
-	},
-	[2] = {
-		.start  = IRQ_GPIO(32),
-		.end    = IRQ_GPIO(32),
-		.flags  = IORESOURCE_IRQ,
-	}
-};
-
-static struct platform_device pxa168_cf_device = {
-	.name		= "pxa168-cf",
-	.id		= -1,
-	.resource	= pxa168_cf_resources,
-	.num_resources	= ARRAY_SIZE(pxa168_cf_resources),
-};
-
-static void __init pxa168_cf_init(void)
-{
-	platform_device_register(&pxa168_cf_device);
-}
-#endif
-
-/*
- * mfp is shared in card, cam and tw9907, only one is effective
- */
-typedef enum{
-	SW_CARD    = 0x01,
-	SW_CAM_ON  = 0x02,
-	SW_CAM_OFF = 0x03,
-	SW_TW9907  = 0x04,
-} SW_TYPE_T;
-
-static int kovan_pinmux_switch(SW_TYPE_T type)
-{
-	int ret = 0;
-
-	if (gpio_request(CARD_EN, "CARD_EN")) {
-		printk(KERN_ERR "Request GPIO failed,"
-				"gpio: %d \n", CARD_EN);
-		return -EIO;
-	}
-
-	if (gpio_request(CAM_PWDN, "CAM_PWDN")) {
-		gpio_free(CARD_EN);
-		printk(KERN_ERR "Request GPIO failed,"
-				"gpio: %d\n", CAM_PWDN);
-		return -EIO;
-	}
-
-	if (gpio_request(TW9907_PWDN, "TW9907_PWDN")) {
-		gpio_free(CARD_EN);
-		gpio_free(CAM_PWDN);
-		printk(KERN_ERR "Request GPIO failed,"
-				"gpio: %d\n", TW9907_PWDN);
-		return -EIO;
-	}
-
-	switch (type) {
-	case SW_CARD:
-		gpio_direction_output(CARD_EN, 1);
-		gpio_direction_output(CAM_PWDN, 1);
-		gpio_direction_output(TW9907_PWDN, 1);
-		break;
-	case SW_CAM_ON:
-		gpio_direction_output(CARD_EN, 0);
-		gpio_direction_output(CAM_PWDN, 0);
-		gpio_direction_output(TW9907_PWDN, 1);
-		break;
-	case SW_CAM_OFF:
-		gpio_direction_output(CARD_EN, 0);
-		gpio_direction_output(CAM_PWDN, 1);
-		gpio_direction_output(TW9907_PWDN, 1);
-		break;
-	case SW_TW9907:
-		gpio_direction_output(CARD_EN, 0);
-		gpio_direction_output(CAM_PWDN, 1);
-		gpio_direction_output(TW9907_PWDN, 0);
-		break;
-	default:
-		ret = -EIO;
-		break;
-	}
-
-	gpio_free(CARD_EN);
-	gpio_free(CAM_PWDN);
-	gpio_free(TW9907_PWDN);
-
-	return ret;
-}
-
-#if defined(CONFIG_PXA168_MSP)
-/* msp platform data */
-static mfp_cfg_t mfp_cfg_msp[]  = {
-	GPIO40_MSP_DAT1,
-	GPIO41_MSP_DAT0,
-	GPIO43_MSP_DAT2,
-	GPIO44_MSP_DAT3,
-	GPIO42_MSP_BS,
-	GPIO50_MSP_SCLK,
-};
-
-static int mspro_mfp_config(void)
-{
-	int ret = 0;
-
-	ret = kovan_pinmux_switch(SW_CARD);
-	if (0 == ret)
-		mfp_config(ARRAY_AND_SIZE(mfp_cfg_msp));
-
-	return ret;
-}
-
-static struct card_platform_data msp_ops = {
-	/* GPIO84 used as mspro detect pin */
-	.pin_detect		= MFP_PIN_GPIO84,
-	.mfp_config		= mspro_mfp_config,
-};
-#endif
-
-#if defined(CONFIG_PXA168_CAMERA)
-static mfp_cfg_t kovan_cam_pins[] = {
-	GPIO37_CAM_DAT7,
-	GPIO38_CAM_DAT6,
-	GPIO39_CAM_DAT5,
-	GPIO40_CAM_DAT4,
-	GPIO41_CAM_DAT3,
-	GPIO42_CAM_DAT2,
-	GPIO43_CAM_DAT1,
-	GPIO44_CAM_DAT0,
-	GPIO46_CAM_VSYNC,
-	GPIO48_CAM_HSYNC,
-	GPIO54_CAM_MCLK,
-	GPIO55_CAM_PCLK,
-};
-
-/* sensor init */
-static int sensor_power_onoff(int on, int id)
-{
-	/*
-	 * on, 1, power on
-	 * on, 0, power off
-	 */
-	int ret = 0;
-	if(on){
-		ret = kovan_pinmux_switch(SW_CAM_ON);
-	        if (0 == ret)
-			mfp_config(ARRAY_AND_SIZE(kovan_cam_pins));
-	}else{
-		ret = kovan_pinmux_switch(SW_CAM_OFF);
-	}
-	return ret;
-}
-
-static struct sensor_platform_data ov7670_sensor_data = {
-	.id = SENSOR_LOW,
-	.power_on = sensor_power_onoff,
-};
-
-/* sensor init over */
-#endif
-
-
-static struct i2c_pxa_platform_data pwri2c_info __initdata = {
-	.use_pio		= 1,
-};
 
 
 static struct fb_videomode video_modes_aspen[] = {
@@ -702,26 +361,6 @@ struct pxa168fb_mach_info kovan_lcd_ovly_info __initdata = {
 
 static struct i2c_board_info kovan_i2c_board_info[] = {
 
-#if defined(CONFIG_PCI)
-	{
-		.type           = "max7312",
-		.addr           = 0x28,  		/* 0x50/0x51 */
-		.platform_data  = &max7312_data[2],
-	},
-#endif
-#if defined(CONFIG_PXA168_CAMERA)
-	{
-		.type		= "ov7670",
-		.addr           = 0x21,
-		.platform_data  = &ov7670_sensor_data,
-	},
-#endif
-#if defined(CONFIG_RTC_DRV_ISL1208)
-	{
-		.type		= "isl1208",
-		.addr           = 0x6f,
-	},
-#endif
 };
 
 static struct i2c_board_info pwr_i2c_board_info[] = {
@@ -732,81 +371,13 @@ static struct i2c_board_info pwr_i2c_board_info[] = {
 };
 
 
-static unsigned int kovan_matrix_key_map[] = {
-	KEY(0, 7, KEY_LEFT),
-	KEY(4, 7, KEY_RIGHT),
-	KEY(0, 6, KEY_HOME),
-	KEY(4, 6, KEY_END),
-	KEY(1, 7, KEY_ENTER),	/* keypad action */
-	KEY(1, 6, KEY_SEND),
+static struct i2c_pxa_platform_data i2c_info __initdata = {
+	.use_pio		= 1,
 };
 
-static unsigned int kovan_android_matrix_key_map[] = {
-	KEY(0, 6, KEY_UP),	/* SW 4 */
-	KEY(0, 7, KEY_DOWN),	/* SW 5 */
-	KEY(1, 6, KEY_LEFT),	/* SW 6 */
-	KEY(1, 7, KEY_RIGHT),	/* SW 7 */
-	KEY(4, 6, KEY_MENU),	/* SW 8 */
-	KEY(4, 7, KEY_BACK),	/* SW 9 */
-};
-
-static struct pxa27x_keypad_platform_data kovan_keypad_info __initdata = {
-	.matrix_key_rows	= 8,
-	.matrix_key_cols	= 8,
-	.matrix_key_map		= kovan_matrix_key_map,
-	.matrix_key_map_size	= ARRAY_SIZE(kovan_matrix_key_map),
-	.debounce_interval	= 30,
-};
-
-static struct pxa27x_keypad_platform_data kovan_android_keypad_info __initdata = {
-	.matrix_key_rows	= 8,
-	.matrix_key_cols	= 8,
-	.matrix_key_map		= kovan_android_matrix_key_map,
-	.matrix_key_map_size	= ARRAY_SIZE(kovan_android_matrix_key_map),
-	.debounce_interval	= 30,
-};
-
-#if (defined(CONFIG_SPI_PXA2XX) || defined(CONFIG_SPI_PXA2XX_MODULE)) \
-	&& defined(CONFIG_MTD_M25P80)
-
-static struct pxa2xx_spi_master pxa_ssp_master_info = {
-	.num_chipselect	= 1,
-	.enable_dma = 1,
-};
-
-static struct pxa2xx_spi_chip m25pxx_spi_info = {
-	.tx_threshold = 1,
-	.rx_threshold = 1,
-	.timeout = 1000,
-	.gpio_cs = 110
-};
-
-static struct spi_board_info __initdata spi_board_info[] = {
-	{
-		.modalias = "m25p80",
-		.mode = SPI_MODE_0,
-		.max_speed_hz = 260000,
-		.bus_num = 2,
-		.chip_select = 0,
-		.platform_data = NULL,
-		.controller_data = &m25pxx_spi_info,
-		.irq = -1,
-	},
-};
-
-static void __init kovan_init_spi(void)
-{
-	//pxa168_add_ssp(1);
-	pxa168_add_spi(2, &pxa_ssp_master_info);
-	spi_register_board_info(spi_board_info, ARRAY_SIZE(spi_board_info));
-}
-#else
-static inline void kovan_init_spi(void) {}
-#endif
 
 
 
-#if defined(CONFIG_MMC_PXA_SDH)
 static struct pfn_cfg mmc3_pfn_cfg[] = {
 	PFN_CFG(PIN_MMC_DAT7, GPIO0_MMC3_DAT7, GPIO0_GPIO),
 	PFN_CFG(PIN_MMC_DAT6, GPIO1_MMC3_DAT6, GPIO1_GPIO),
@@ -822,10 +393,8 @@ static struct pfn_cfg mmc3_pfn_cfg[] = {
 	PFN_CFG(PIN_MMC_WP, PFN_UNDEF, PFN_UNDEF),
 	PFN_CFG(PIN_MMC_END, PFN_TERM, PFN_TERM),
 };
-#endif
 
 
-#if defined(CONFIG_MMC3)
 static struct pxasdh_platform_data kovan_sdh_platform_data_mmc3 = {
 	.detect_delay	= 20,
 	.ocr_mask	= MMC_VDD_29_30 | MMC_VDD_30_31,
@@ -833,9 +402,8 @@ static struct pxasdh_platform_data kovan_sdh_platform_data_mmc3 = {
 	.quirks 	= SDHCI_QUIRK_BROKEN_CARD_DETECTION,
 	.pfn_table	= mmc3_pfn_cfg,
 };
-#endif
 
-#ifdef CONFIG_USB_GADGET_PXA_U2O
+
 
 static int kovan_u2o_vbus_status(unsigned base)
 {
@@ -874,15 +442,10 @@ static struct pxa_usb_plat_info kovan_u2o_info = {
 	.vbus_set	= kovan_u2o_vbus_set,
 	.vbus_status	= kovan_u2o_vbus_status,
 	.init_pmic_ops	= (void *)init_kovan_otg_ops,
-#ifdef CONFIG_USB_OTG
 	.is_otg		= 1,
-#else
-	.clk_gating	= 1,
-#endif
 };
-#endif
 
-#ifdef CONFIG_USB_EHCI_PXA_U2H
+
 /* USB 2.0 Host Controller */
 static int kovan_u2h_vbus_set (int enable)
 {
@@ -896,7 +459,6 @@ static struct pxa_usb_plat_info kovan_u2h_info = {
 	.phy_init	= pxa168_usb_phy_init,
 	.vbus_set	= kovan_u2h_vbus_set,
 };
-#endif
 
 
 
@@ -916,12 +478,8 @@ static void __init kovan_init(void)
 	pxa168_add_freq();
 
 	pxa168_add_ssp(0);
-	pxa168_add_twsi(0, &pwri2c_info, ARRAY_AND_SIZE(kovan_i2c_board_info));
-	pxa168_add_twsi(1, &pwri2c_info, ARRAY_AND_SIZE(pwr_i2c_board_info));
-	if (is_android())
-		pxa168_add_keypad(&kovan_android_keypad_info);
-	else
-		pxa168_add_keypad(&kovan_keypad_info);
+	pxa168_add_twsi(0, &i2c_info, ARRAY_AND_SIZE(kovan_i2c_board_info));
+	pxa168_add_twsi(1, &i2c_info, ARRAY_AND_SIZE(pwr_i2c_board_info));
 
 #ifdef CONFIG_USB_GADGET_PXA_U2O
  	pxa168_add_u2o(&kovan_u2o_info);
@@ -938,13 +496,9 @@ static void __init kovan_init(void)
 #ifdef CONFIG_PCI
 	pxa168_add_pcie(&pxa168_pcie_data);
 #endif
-#if defined(CONFIG_MMC_PXA_SDH)
-#if defined(CONFIG_MMC3)
 	pxa168_add_sdh(2, &kovan_sdh_platform_data_mmc3);
-#endif
-#endif
 #if defined(CONFIG_CIR)
-	pxa168_cir_init(); /*init the gpio */
+	pxa168_cir_init();
 #endif
 #if defined(CONFIG_PXA168_MSP)
 	pxa168_add_msp(&msp_ops);
@@ -960,17 +514,6 @@ static void __init kovan_init(void)
 	//pxa168_add_fb(&kovan_lcd_info);
 	pxa168_add_fb_ovly(&kovan_lcd_ovly_info);
 
-	kovan_init_spi();
-#if defined(CONFIG_PXA168_CAMERA)
-	pxa168_add_cam();
-#endif
-#if defined(CONFIG_PXA_ICR)
-	pxa168_add_icr();
-#endif
-
-#if defined(CONFIG_BATTERY_ASPENITE)
-	kovan_add_battery();
-#endif
 	pxa168_add_rtc(&pxa910_device_rtc);
 
 }
