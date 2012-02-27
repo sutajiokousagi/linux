@@ -63,29 +63,8 @@
 #define USB_WIFI_GPIO 101
 
 static unsigned long kovan_pin_config[] __initdata = {
-	// Note that the range of GPIO0-GPIO09 conflicts with MMC3
-	// See below for definition of MMC3
-	#if !defined(CONFIG_CHUMBY_SILVERMOON_SDBOOT) && !defined(CONFIG_MMC3)
-	/* Data Flash Interface */
-	GPIO0_DFI_D15,
-	GPIO1_DFI_D14,
-	GPIO2_DFI_D13,
-	GPIO3_DFI_D12,
-	GPIO4_DFI_D11,
-	GPIO5_DFI_D10,
-	GPIO6_DFI_D9,
-	GPIO7_DFI_D8,
-	GPIO8_DFI_D7,
-	GPIO9_DFI_D6,
-	GPIO10_DFI_D5,
-	GPIO11_DFI_D4,
-	GPIO12_DFI_D3,
-	GPIO13_DFI_D2,
-	GPIO14_DFI_D1,
-	GPIO15_DFI_D0,
-	#endif
 
-	#if defined(CONFIG_MMC3)
+	/* MMC controller */
 	GPIO0_MMC3_DAT7,
 	GPIO1_MMC3_DAT6,
 	GPIO2_MMC3_DAT5,
@@ -97,20 +76,6 @@ static unsigned long kovan_pin_config[] __initdata = {
 	GPIO8_MMC3_CLK,
 	GPIO9_MMC3_CMD,
 	GPIO16_SMC_nCS0_DIS,
-	#endif
-
-	/* Static Memory Controller */
-	#ifndef CONFIG_PXA168_CF
-	GPIO18_SMC_nCS0,
-	GPIO34_SMC_nCS1,
-	GPIO23_SMC_nLUA,
-	GPIO25_SMC_nLLA,
-	GPIO28_SMC_RDY,
-	GPIO29_SMC_SCLK,
-	GPIO35_SMC_BE1,
-	GPIO36_SMC_BE2,
-	GPIO27_GPIO,    /* Ethernet IRQ */
-	#endif
 
 
 	/* LCD */
@@ -144,43 +109,32 @@ static unsigned long kovan_pin_config[] __initdata = {
 	MFP_CFG_DRV_PULL(GPIO83, AF1, FAST, LOW),
 
 
-	//CSM_GPIO85_XotgDRV_VBUS,
-
-
-	/* i2c bus */
+	/* I2C bus */
 	GPIO105_CI2C_SDA,
 	GPIO106_CI2C_SCL,
 
-	/* Added to ensure UART1 input works */
+	/* UART1 input */
 	MFP_CFG(GPIO109, AF0),
 
 	/* SSP0 */
-	GPIO113_I2S_MCLK, // and this is in fact the I2S audio output to the FPGA
+	GPIO113_I2S_MCLK, // I2S audio output to the FPGA
 	GPIO114_I2S_FRM,
 	GPIO115_I2S_BCLK,
 	GPIO116_I2S_RXD,
-
 	MFP_CFG(GPIO117, AF0),
 
-	/* Configure FPGA pins */
+	/* Status LED */
+	MFP_CFG(GPIO96, AF1),
+
+	/* FPGA programming GPIOs */
+	MFP_CFG(GPIO119, AF0), // fpga_reset_n (output)
+	MFP_CFG(GPIO120, AF0), // fpga_init_n (input, mostly)
+	MFP_CFG(GPIO97, AF0), // fpga_done (input)
+
+	/* FPGA status GPIOs */
 	MFP_CFG(GPIO91, AF0), /* HPD report */
 	MFP_CFG(GPIO92, AF0), /* Key ready */
 	MFP_CFG(GPIO93, AF0), /* Low-voltage alarm */
-
-
-	/* Turn on power to LCD */
-	//CSM_GPIO84_LCD_PWM,
-
-	#if defined(CONFIG_LEDS_NETV) || defined(CONFIG_LEDS_NETV_MODULE)
-	/* Set GPIO96 as PWM2 */
-	MFP_CFG(GPIO96, AF1),
-	#endif
-
-	//CSM_GPIO118_TS_SCLK,
-	MFP_CFG(GPIO119, AF0), // fpga_reset_n (output)
-	MFP_CFG(GPIO120, AF0), // fpga_init_n (input, mostly)
-	//CSM_GPIO121_TS_MOSI, // fpga_din (output)
-	MFP_CFG(GPIO97, AF0), // fpga_done (input)
 
 	/* Recovery button */
 	MFP_CFG(GPIO89, AF0),
@@ -188,11 +142,7 @@ static unsigned long kovan_pin_config[] __initdata = {
 	/* vsync input */
 	MFP_CFG(GPIO49, AF0),
 
-	/* LED outputs */
-	MFP_CFG(GPIO45, AF0),
-	MFP_CFG(GPIO46, AF0),
-
-	/* Touchscreen */
+	/* Touchscreen IRQ */
 	MFP_CFG(GPIO52, AF0),
 };
 
