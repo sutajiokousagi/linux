@@ -43,11 +43,6 @@ static void apbc_clk_disable(struct clk *clk)
 
 static void apbc_pwm_clk_disable(struct clk *clk)
 {
-	u32 tmp = __raw_readl(clk->clk_rst);
-	tmp &= ~(0x02L);
-	__raw_writel(tmp, clk->clk_rst);
-	tmp &= ~(0x03L);
-	__raw_writel(tmp, clk->clk_rst);
 }
 
 struct clkops apbc_pwm_clk_ops = {
