@@ -493,35 +493,19 @@ static void __init kovan_init(void)
 	pxa168_add_twsi(0, &i2c_info, ARRAY_AND_SIZE(kovan_i2c_board_info));
 	pxa168_add_twsi(1, &i2c_info, ARRAY_AND_SIZE(pwr_i2c_board_info));
 
-#ifdef CONFIG_USB_GADGET_PXA_U2O
  	pxa168_add_u2o(&kovan_u2o_info);
-#endif
 
 #ifdef CONFIG_USB_OTG
 	pxa168_add_u2ootg(&kovan_u2o_info);
 	pxa168_add_u2oehci(&kovan_u2o_info);
 #endif
 
-#ifdef CONFIG_USB_EHCI_PXA_U2H
  	pxa168_add_u2h(&kovan_u2h_info);
-#endif
-#ifdef CONFIG_PCI
-	pxa168_add_pcie(&pxa168_pcie_data);
-#endif
+
 	pxa168_add_sdh(2, &kovan_sdh_platform_data_mmc3);
-#if defined(CONFIG_CIR)
+
 	pxa168_cir_init();
-#endif
-#if defined(CONFIG_PXA168_MSP)
-	pxa168_add_msp(&msp_ops);
-#endif
-#if defined(CONFIG_PXA168_CF)
-#if defined(CONFIG_PXA168_CF_USE_GPIO_CARDDETECT)
-	pxa168_cf_init();
-#else
-	pxa168_add_cf();	
-#endif
-#endif
+
 
 	//pxa168_add_fb(&kovan_lcd_info);
 	//pxa168_add_fb_ovly(&kovan_lcd_ovly_info);
