@@ -478,51 +478,6 @@ struct platform_device pxa910_device_imm = {
         .num_resources  = ARRAY_SIZE(pxa910_resource_imm),
 	.resource       = pxa910_resource_imm,
 };
-
-static struct resource pxa168_resource_pwm1[] = {
-	[0] = {
-		.start  = 0xD401A400,
-		.end    = 0xD401A40B,
-		.flags  = IORESOURCE_MEM,
-	},
-};
-
-struct platform_device pxa168_device_pwm1 = {
-	.name           = "pxa168-pwm",
-	.id             = 1,
-	.resource       = pxa168_resource_pwm1,
-	.num_resources  = ARRAY_SIZE(pxa168_resource_pwm1),
-};
-
-static struct resource pxa168_resource_pwm2[] = {
-	[0] = {
-		.start  = 0xD401A800,
-		.end    = 0xD401A80B,
-		.flags  = IORESOURCE_MEM,
-	},
-};
-
-struct platform_device pxa168_device_pwm2 = {
-	.name           = "pxa168-pwm",
-	.id             = 2,
-	.resource       = pxa168_resource_pwm2,
-	.num_resources  = ARRAY_SIZE(pxa168_resource_pwm2),
-};
-
-static struct resource pxa168_resource_pwm3[] = {
-	[0] = {
-		.start  = 0xD401AC00,
-		.end    = 0xD401AC0B,
-		.flags  = IORESOURCE_MEM,
-	},
-};
-
-struct platform_device pxa168_device_pwm3 = {
-	.name           = "pxa168-pwm",
-	.id             = 3,
-	.resource       = pxa168_resource_pwm3,
-	.num_resources  = ARRAY_SIZE(pxa168_resource_pwm3),
-};
 #endif
 
 static struct resource pxa168_resource_pwm0[] = {
@@ -538,6 +493,51 @@ struct platform_device pxa168_device_pwm0 = {
 	.id             = 0,
 	.resource       = pxa168_resource_pwm0,
 	.num_resources  = ARRAY_SIZE(pxa168_resource_pwm0),
+};
+
+static struct resource pxa168_resource_pwm1[] = {
+	[0] = {
+		.start  = 0xd401a400,
+		.end    = 0xd401a40b,
+		.flags  = IORESOURCE_MEM,
+	},
+};
+
+struct platform_device pxa168_device_pwm1 = {
+	.name           = "pxa168-pwm",
+	.id             = 1,
+	.resource       = pxa168_resource_pwm1,
+	.num_resources  = ARRAY_SIZE(pxa168_resource_pwm1),
+};
+
+static struct resource pxa168_resource_pwm2[] = {
+	[0] = {
+		.start  = 0Xd401a800,
+		.end    = 0Xd401a80b,
+		.flags  = IORESOURCE_MEM,
+	},
+};
+
+struct platform_device pxa168_device_pwm2 = {
+	.name           = "pxa168-pwm",
+	.id             = 2,
+	.resource       = pxa168_resource_pwm2,
+	.num_resources  = ARRAY_SIZE(pxa168_resource_pwm2),
+};
+
+static struct resource pxa168_resource_pwm3[] = {
+	[0] = {
+		.start  = 0Xd401ac00,
+		.end    = 0Xd401ac0b,
+		.flags  = IORESOURCE_MEM,
+	},
+};
+
+struct platform_device pxa168_device_pwm3 = {
+	.name           = "pxa168-pwm",
+	.id             = 3,
+	.resource       = pxa168_resource_pwm3,
+	.num_resources  = ARRAY_SIZE(pxa168_resource_pwm3),
 };
 
 static struct resource pxa168_resource_freq[] = {
