@@ -23,6 +23,7 @@
 #include <linux/mfd/stmpe.h>
 #include <linux/leds_pwm.h>
 #include <linux/pwm_backlight.h>
+#include <linux/gpio_keys.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -43,26 +44,12 @@
 #include <plat/pxa_u2o.h>
 #include <plat/pxa3xx_otg.h>
 
-#if defined(CONFIG_SPI_PXA2XX)
-#include <linux/spi/spi.h>
-#include <plat/pxa2xx_spi.h>
-#endif
-
 #include "common.h"
 #include <linux/mmc/sdhci.h>
 #include <plat/pfn_cfg.h>
 
-/*used by expander max7312, 16 pins gpio expander */
-#define GPIO_EXT0(x)		(NR_BUILTIN_GPIO + (x))
-#define GPIO_EXT1(x)		(NR_BUILTIN_GPIO + 16 + (x))
-#define GPIO_EXT2(x)		(NR_BUILTIN_GPIO + 16 + 16 + (x))
-
-#define CARD_EN GPIO_EXT1(0)
-#define CAM_PWDN GPIO_EXT1(1)
-#define TW9907_PWDN GPIO_EXT1(4)
-#define TW9907_RST_N GPIO_EXT1(2)
-
 #define USB_WIFI_GPIO 101
+#define KOVAN_GPIO_POWERKEY 89
 
 static unsigned long kovan_pin_config[] __initdata = {
 
@@ -204,6 +191,34 @@ static struct platform_device kovan_leds_device = {
 
 
 
+/*
+ * GPIO keys
+ */
+static struct gpio_keys_button kovan_gpio_keys_buttons[] = {
+	{
+		.code		= KEY_POWER,
+		.gpio		= KOVAN_GPIO_POWERKEY,
+		.active_low	= 1,
+		.desc		= "Power",
+		.type		= EV_KEY,
+		.wakeup		= 1,
+	},
+};
+
+static struct gpio_keys_platform_data kovan_gpio_keys_data = {
+	.buttons	= kovan_gpio_keys_buttons,
+	.nbuttons	= ARRAY_SIZE(kovan_gpio_keys_buttons),
+};
+
+static struct platform_device kovan_keys_device = {
+	.name	= "gpio-keys",
+	.id	= -1,
+	.dev	= {
+		.platform_data = &kovan_gpio_keys_data,
+	},
+};
+
+
 
 
 static struct fb_videomode video_modes_aspen[] = {
@@ -311,8 +326,6 @@ struct pxa168fb_mach_info kovan_lcd_info __initdata = {
 	.dumb_mode              = DUMB_MODE_RGB888,
 	.active                 = 1,
 	.spi_ctrl		= CFG_SCLKCNT(2) | CFG_TXBITS(16) | CFG_SPI_SEL(1) | CFG_SPI_3W4WB(1) | CFG_SPI_ENA(1),
-	.spi_gpio_cs		= GPIO_EXT1(14),
-	.spi_gpio_reset         = -1,
 	.panel_rbswap		= 1,
 	.invert_pixclock	= 1,
 	.max_fb_size		= 1024 * 768 * 4 * 2,
@@ -511,9 +524,11 @@ static void __init kovan_init(void)
 #endif
 
 	//pxa168_add_fb(&kovan_lcd_info);
-	pxa168_add_fb_ovly(&kovan_lcd_ovly_info);
+	//pxa168_add_fb_ovly(&kovan_lcd_ovly_info);
 
 	pxa168_add_rtc(&pxa910_device_rtc);
+
+	platform_device_register(&kovan_keys_device);
 
 	/* Add the power state LED */
 	platform_device_register(&pxa168_device_pwm2);
