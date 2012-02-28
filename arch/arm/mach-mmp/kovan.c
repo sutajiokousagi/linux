@@ -277,17 +277,22 @@ static struct fb_videomode video_modes_aspen[] = {
 #define     CFG_SPI_3W4WB(wire)                 (wire<<1)  /* 1: 3-wire; 0: 4-wire */
 
 struct pxa168fb_mach_info kovan_lcd_info __initdata = {
-	.id                     = "Base-aspen",
+	.id                     = "Base-kovan",
 	.modes                  = video_modes_aspen,
 	.num_modes              = ARRAY_SIZE(video_modes_aspen),
 	.pix_fmt                = PIX_FMT_RGB565,
-	.io_pin_allocation_mode = PIN_MODE_DUMB_24,
-	.dumb_mode              = DUMB_MODE_RGB888,
-	.active                 = 1,
-	.spi_ctrl		= CFG_SCLKCNT(2) | CFG_TXBITS(16) | CFG_SPI_SEL(1) | CFG_SPI_3W4WB(1) | CFG_SPI_ENA(1),
-	.panel_rbswap		= 1,
-	.invert_pixclock	= 1,
 	.max_fb_size		= 320 * 240 * 4 * 2,
+
+	.active                 = 1,
+	.enable_lcd             = 1,
+
+        .io_pin_allocation_mode = PIN_MODE_DUMB_18_GPIO,
+
+	.dumb_mode              = DUMB_MODE_RGB666,
+	.gpio_output_mask	= 0xff,
+	.gpio_output_data	= 0x10,
+
+	.invert_pix_val_ena	= 1,
 };
 
 struct pxa168fb_mach_info kovan_lcd_ovly_info __initdata = {
@@ -295,23 +300,16 @@ struct pxa168fb_mach_info kovan_lcd_ovly_info __initdata = {
         .modes                  = video_modes_aspen,
         .num_modes              = ARRAY_SIZE(video_modes_aspen),
         .pix_fmt                = PIX_FMT_RGB565,
-        .io_pin_allocation_mode = PIN_MODE_DUMB_18_GPIO,
-	.dumb_mode              = DUMB_MODE_RGB666,
-/*
 	.active                 = 1,
-	.panel_rbswap		= 1,
-	.invert_pixclock        = 1,
-	.invert_vsync           = 1,
-	.invert_hsync           = 1,
-	.panel_rgb_reverse_lanes= 0,
-	.invert_composite_blank = 0,
-	.invert_pix_val_ena     = 0,
-	.panel_rbswap           = 0,
 	.enable_lcd             = 1,
-	.spi_gpio_cs            = 0,
-	.spi_gpio_reset         = 0,
-	.max_fb_size		= 1920 * 1080 * 2 * 2,
-*/
+
+        .io_pin_allocation_mode = PIN_MODE_DUMB_18_GPIO,
+
+	.dumb_mode              = DUMB_MODE_RGB666,
+	.gpio_output_mask	= 0xff,
+	.gpio_output_data	= 0x10,
+
+	.invert_pix_val_ena	= 1,
 };
 
 
