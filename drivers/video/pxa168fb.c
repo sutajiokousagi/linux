@@ -497,6 +497,10 @@ static int pxa168fb_check_var(struct fb_var_screeninfo *var,
 static void set_clock_divider(struct pxa168fb_info *fbi,
 			      const struct fb_videomode *m)
 {
+#ifdef CONFIG_MACH_KOVAN
+	/* Kovan is externally clocked, so leave the divider alone */
+	writel(0x90000001, fbi->reg_base + LCD_CFG_SCLK_DIV);
+#else
 	int divider_int;
 	int needed_pixclk;
 	u64 div_result;
@@ -543,6 +547,7 @@ static void set_clock_divider(struct pxa168fb_info *fbi,
 	 */
 	x |= divider_int;
 	writel(x, fbi->reg_base + LCD_CFG_SCLK_DIV);
+#endif /* CONFIG_MACH_KOVAN */
 }
 
 static void set_dma_control0(struct pxa168fb_info *fbi)
