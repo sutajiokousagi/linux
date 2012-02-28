@@ -226,93 +226,46 @@ static struct platform_device kovan_keys_device = {
 
 
 
+/*
+ * Backlight data
+ */
+static struct platform_pwm_backlight_data kovan_backlight_data = {
+	.pwm_id		= 0,
+	.max_brightness	= 100,
+	.dft_brightness	= 100,
+	.pwm_period_ns	= 10000,
+};
 
+static struct platform_device kovan_backlight_device = {
+	.name		= "pwm-backlight",
+	.dev		= {
+		.parent		= &pxa168_device_pwm0.dev,
+		.platform_data	= &kovan_backlight_data,
+	},
+};
+
+
+/*
+ * Video interfaces
+ */
 static struct fb_videomode video_modes_aspen[] = {
 	/* lpj032l001b HVGA mode info */
         [0] = {
-                .pixclock       = 16129,
+                .pixclock       = 156000,
                 .refresh        = 60,
-                .xres           = 1280,
-                .yres           = 720,
-                .hsync_len      = 40,
-                .left_margin    = 220,
-                .right_margin   = 110,
-                .vsync_len      = 5,
-                .upper_margin   = 20,
-                .lower_margin   = 5,
+
+                .hsync_len      = 30,
+                .left_margin    = 38,
+                .xres           = 320,
+                .right_margin   = 20,
+
+                .vsync_len      = 3,
+                .upper_margin   = 15,
+                .yres           = 240,
+                .lower_margin   = 4,
+
                 .sync           = 0, 
         },
-
-	[1] = {
-		.pixclock       = 30120,
-		.refresh        = 60,
-		.xres           = 800,
-		.yres           = 480,
-		.hsync_len      = 1,
-		.left_margin    = 215,
-		.right_margin   = 40,
-		.vsync_len      = 1,
-		.upper_margin   = 34,
-		.lower_margin   = 10,
-		.sync           = FB_SYNC_VERT_HIGH_ACT | FB_SYNC_HOR_HIGH_ACT,
-	},
-
-        [2] = {
-                .pixclock       = 16129,
-                .refresh        = 60,
-                .xres           = 1024,
-                .yres           = 768,
-                .hsync_len      = 136,
-                .left_margin    = 160,
-                .right_margin   = 24,
-                .vsync_len      = 6,
-                .upper_margin   = 29,
-                .lower_margin   = 3,
-                .sync           = 0, 
-        },
-
-        [3] = {
-                .pixclock       = 25641,
-                .refresh        = 60,
-                .xres           = 800,
-                .yres           = 600,
-                .hsync_len      = 128,
-                .left_margin    = 88,
-                .right_margin   = 40,
-                .vsync_len      = 4,
-                .upper_margin   = 23,
-                .lower_margin   = 1,
-                .sync           = 0, 
-        },
-
-        [4] = {
-                .pixclock       = 111111,
-                .refresh        = 60,
-                .xres           = 480,
-                .yres           = 272,
-                .hsync_len      = 1,
-                .left_margin    = 43,
-                .right_margin   = 2,
-                .vsync_len      = 1,
-                .upper_margin   = 12,
-                .lower_margin   = 2,
-                .sync           = 0, 
-        },
-
-        [5] = {
-                .pixclock       = 39722,
-                .refresh        = 60,
-                .xres           = 640,
-                .yres           = 480,
-                .hsync_len      = 96,
-                .left_margin    = 40,
-                .right_margin   = 8,
-                .vsync_len      = 2,
-                .upper_margin   = 25,
-                .lower_margin   = 2,
-                .sync           = 0, 
-        },
-
 };
 
 /* SPI Control Register. */
@@ -334,7 +287,7 @@ struct pxa168fb_mach_info kovan_lcd_info __initdata = {
 	.spi_ctrl		= CFG_SCLKCNT(2) | CFG_TXBITS(16) | CFG_SPI_SEL(1) | CFG_SPI_3W4WB(1) | CFG_SPI_ENA(1),
 	.panel_rbswap		= 1,
 	.invert_pixclock	= 1,
-	.max_fb_size		= 1024 * 768 * 4 * 2,
+	.max_fb_size		= 320 * 240 * 4 * 2,
 };
 
 struct pxa168fb_mach_info kovan_lcd_ovly_info __initdata = {
@@ -344,6 +297,7 @@ struct pxa168fb_mach_info kovan_lcd_ovly_info __initdata = {
         .pix_fmt                = PIX_FMT_RGB565,
         .io_pin_allocation_mode = PIN_MODE_DUMB_18_GPIO,
 	.dumb_mode              = DUMB_MODE_RGB666,
+/*
 	.active                 = 1,
 	.panel_rbswap		= 1,
 	.invert_pixclock        = 1,
@@ -357,9 +311,15 @@ struct pxa168fb_mach_info kovan_lcd_ovly_info __initdata = {
 	.spi_gpio_cs            = 0,
 	.spi_gpio_reset         = 0,
 	.max_fb_size		= 1920 * 1080 * 2 * 2,
+*/
 };
 
 
+
+
+/*
+ * I2C devices
+ */
 static struct i2c_board_info kovan_i2c_board_info[] = {
 
 };
@@ -378,6 +338,9 @@ static struct i2c_pxa_platform_data i2c_info __initdata = {
 
 
 
+/*
+ * MMC interface
+ */
 
 static struct pfn_cfg mmc3_pfn_cfg[] = {
 	PFN_CFG(PIN_MMC_DAT7, GPIO0_MMC3_DAT7, GPIO0_GPIO),
@@ -406,6 +369,10 @@ static struct pxasdh_platform_data kovan_sdh_platform_data_mmc3 = {
 
 
 
+
+/*
+ * USB OTG interface
+ */
 static int kovan_u2o_vbus_status(unsigned base)
 {
 	return 0;
@@ -448,33 +415,18 @@ static struct pxa_usb_plat_info kovan_u2o_info = {
 
 
 /* USB 2.0 Host Controller */
-static int kovan_u2h_vbus_set (int enable)
-{
-	gpio_request(USB_WIFI_GPIO, "Wifi Enable");
-	gpio_direction_output(USB_WIFI_GPIO, 1);
-	gpio_set_value(USB_WIFI_GPIO, 1);
-	return 0;
-}
-
 static struct pxa_usb_plat_info kovan_u2h_info = {
 	.phy_init	= pxa168_usb_phy_init,
-	.vbus_set	= kovan_u2h_vbus_set,
+	.vbus_set	= kovan_u2o_vbus_set,
 };
 
 
-static struct platform_pwm_backlight_data kovan_backlight_data = {
-	.pwm_id		= 0,
-	.max_brightness	= 100,
-	.dft_brightness	= 100,
-	.pwm_period_ns	= 10000,
-};
 
-static struct platform_device kovan_backlight_device = {
-	.name		= "pwm-backlight",
-	.dev		= {
-		.parent		= &pxa168_device_pwm0.dev,
-		.platform_data	= &kovan_backlight_data,
-	},
+/*
+ * FPGA interface
+ */
+static struct platform_device kovan_fpga_device = {
+	.name		= "silvermoon-fpga",
 };
 
 
@@ -513,8 +465,11 @@ static void __init kovan_init(void)
 	pxa168_cir_init();
 
 
-	//pxa168_add_fb(&kovan_lcd_info);
-	//pxa168_add_fb_ovly(&kovan_lcd_ovly_info);
+	pxa168_add_fb(&kovan_lcd_info);
+	pxa168_add_fb_ovly(&kovan_lcd_ovly_info);
+
+	/* Add FPGA device interface */
+	platform_device_register(&kovan_fpga_device);
 
 	pxa168_add_rtc(&pxa910_device_rtc);
 
@@ -528,6 +483,8 @@ static void __init kovan_init(void)
 	platform_device_register(&pxa168_device_pwm0);
 	platform_device_register(&kovan_backlight_device);
 }
+
+
 
 MACHINE_START(KOVAN, "PXA168-based Kovan Platform")
 	.phys_io        = APB_PHYS_BASE,
