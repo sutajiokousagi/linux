@@ -118,15 +118,23 @@ static unsigned long kovan_pin_config[] __initdata = {
 	/* LCD backlight */
 	GPIO84_PWM1_OUT,
 
+
 	/* FPGA programming GPIOs */
-	MFP_CFG(GPIO119, AF0), // fpga_reset_n (output)
-	MFP_CFG(GPIO120, AF0), // fpga_init_n (input, mostly)
-	MFP_CFG(GPIO97, AF0), // fpga_done (input)
+	MFP_CFG(GPIO119, AF0), /* fpga_reset_n (output) */
+	MFP_CFG(GPIO120, AF0), /* fpga_init_n (input, mostly) */
+	MFP_CFG(GPIO97, AF0), /* fpga_done (input) */
+
+	/* FPGA programming SSPs */
+	MFP_CFG(GPIO118, AF1), /* ssp2_clk */
+	MFP_CFG(GPIO121, AF1), /* ssp2_txd */
+	MFP_CFG(GPIO90, AF3), /* ssp3_clk */
 
 	/* FPGA status GPIOs */
 	MFP_CFG(GPIO91, AF0), /* HPD report */
 	MFP_CFG(GPIO92, AF0), /* Key ready */
 	MFP_CFG(GPIO93, AF0), /* Low-voltage alarm */
+
+
 
 	/* FPGA JTAG lines */
 	MFP_CFG(GPIO16, AF0), /* JTAG TDI */
@@ -267,14 +275,6 @@ static struct fb_videomode video_modes_aspen[] = {
                 .sync           = 0, 
         },
 };
-
-/* SPI Control Register. */
-#define     CFG_SCLKCNT(div)                    (div<<24)  /* 0xFF~0x2 */
-#define     CFG_RXBITS(rx)                      ((rx - 1)<<16)   /* 0x1F~0x1 */
-#define     CFG_TXBITS(tx)                      ((tx - 1)<<8)    /* 0x1F~0x1, 0x1: 2bits ... 0x1F: 32bits */
-#define     CFG_SPI_ENA(spi)                    (spi<<3)
-#define     CFG_SPI_SEL(spi)                    (spi<<2)   /* 1: port1; 0: port0 */
-#define     CFG_SPI_3W4WB(wire)                 (wire<<1)  /* 1: 3-wire; 0: 4-wire */
 
 struct pxa168fb_mach_info kovan_lcd_info __initdata = {
 	.id                     = "Base-kovan",
