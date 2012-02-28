@@ -155,8 +155,9 @@ static inline void update_edge_detect(struct pxa_gpio_chip *c)
 	__raw_writel(gfer, c->regbase + GFER_OFFSET);
 }
 
-static int pxa_gpio_irq_type(unsigned int irq, unsigned int type)
+static int pxa_gpio_irq_type(struct irq_data *data, unsigned int type)
 {
+	unsigned int irq = data->irq;
 	struct pxa_gpio_chip *c;
 	int gpio = irq_to_gpio(irq);
 	unsigned long gpdr, mask = GPIO_bit(gpio);
@@ -263,7 +264,7 @@ static struct irq_chip pxa_muxed_gpio_chip = {
 	.ack		= pxa_ack_muxed_gpio,
 	.mask		= pxa_mask_muxed_gpio,
 	.unmask		= pxa_unmask_muxed_gpio,
-	.set_type	= pxa_gpio_irq_type,
+	.irq_set_type	= pxa_gpio_irq_type,
 };
 
 void __init pxa_init_gpio(int mux_irq, int start, int end, set_wake_t fn)
