@@ -2253,13 +2253,16 @@ static int pxa168fb_probe(struct platform_device *pdev)
 	/*
 	 * Fill in sane defaults.
 	 */
+	dev_err(&pdev->dev, "Setting mode...\n");
 	set_mode(fbi, &fi->var, mi->modes, mi->pix_fmt, 1);
+	dev_err(&pdev->dev, "Setting par...\n");
 	pxa168fb_set_par(fi);
 	fbi->active = mi->active;
 
 	/*
 	 * Configure default register values.
 	 */
+	dev_err(&pdev->dev, "Writing register values...\n");
 	writel(0x00000000, fbi->reg_base + LCD_SPU_DMA_START_ADDR_Y1);
 	writel(0x00000000, fbi->reg_base + LCD_SPU_DMA_START_ADDR_U1);
 	writel(0x00000000, fbi->reg_base + LCD_SPU_DMA_START_ADDR_V1);
@@ -2300,6 +2303,7 @@ static int pxa168fb_probe(struct platform_device *pdev)
 	/*
 	 * Allocate color map.
 	 */
+	dev_err(&pdev->dev, "Allocating color map...\n");
 	if (fb_alloc_cmap(&fi->cmap, 256, 0) < 0) {
 		ret = -ENOMEM;
 		goto failed;
@@ -2308,6 +2312,7 @@ static int pxa168fb_probe(struct platform_device *pdev)
 	/*
 	 * Get IRQ number.
 	 */
+	dev_err(&pdev->dev, "Getting IRQ...\n");
 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 	if (res == NULL)
 		return -EINVAL;
@@ -2315,6 +2320,7 @@ static int pxa168fb_probe(struct platform_device *pdev)
 	/*
 	 * Register irq handler.
 	 */
+	dev_err(&pdev->dev, "Requesting IRQ...\n");
 	ret = request_irq(res->start, pxa168fb_handle_irq, IRQF_SHARED,
 				mi->id, fi);
 	if (ret < 0)
