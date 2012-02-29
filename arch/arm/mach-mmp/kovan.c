@@ -105,6 +105,10 @@ static unsigned long kovan_pin_config[] __initdata = {
 	/* UART1 input */
 	MFP_CFG(GPIO109, AF0),
 
+	/* UART3 */
+	MFP_CFG(GPIO98, AF2), // txd (cpu to world)
+	MFP_CFG(GPIO99, AF2), // rxd (world to cpu)
+
 	/* SSP0 */
 	GPIO113_I2S_MCLK, // I2S audio output to the FPGA
 	GPIO114_I2S_FRM,
@@ -442,6 +446,7 @@ static void __init kovan_init(void)
 
 	/* on-chip devices */
 	pxa168_add_uart(1);
+	pxa168_add_uart(3);
 
 	pxa168_add_freq();
 
