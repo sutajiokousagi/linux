@@ -49,23 +49,16 @@ static const u16 es8328_reg_defaults[] = {
 static const DECLARE_TLV_DB_SCALE(es8328_tlv, -12750, 50, 1);
 
 static const struct snd_kcontrol_new es8328_snd_controls[] = {
-
-	SOC_SINGLE("Playback Volume", ES8328_DACCONTROL26, 0, 36, 0),
-//SOC_SINGLE("Deemphasis", ES8328_DACCTL, 1, 1, 0),
+	SOC_SINGLE("PCM Volume", ES8328_DACCONTROL26, 0, 36, 0),
 };
 
 /*
  * DAPM controls.
  */
 static const struct snd_soc_dapm_widget es8328_dapm_widgets[] = {
-//SND_SOC_DAPM_DAC("DAC", "HiFi Playback", SND_SOC_NOPM, 0, 0),
-//SND_SOC_DAPM_OUTPUT("VOUTL"),
-//SND_SOC_DAPM_OUTPUT("VOUTR"),
 };
 
 static const struct snd_soc_dapm_route intercon[] = {
-//	{"VOUTL", NULL, "DAC"},
-//	{"VOUTR", NULL, "DAC"},
 };
 
 static int es8328_add_widgets(struct snd_soc_codec *codec)
@@ -80,15 +73,13 @@ static int es8328_add_widgets(struct snd_soc_codec *codec)
 
 static int es8328_mute(struct snd_soc_dai *dai, int mute)
 {
-/*
 	struct snd_soc_codec *codec = dai->codec;
-	u16 mute_reg = snd_soc_read(codec, ES8328_DACCTL);
+	u16 mute_reg = snd_soc_read(codec, ES8328_DACCONTROL3);
 
 	if (mute)
-		snd_soc_write(codec, ES8328_DACCTL, mute_reg | 1);
+		snd_soc_write(codec, ES8328_DACCONTROL3, mute_reg | 4);
 	else
-		snd_soc_write(codec, ES8328_DACCTL, mute_reg & ~1);
-*/
+		snd_soc_write(codec, ES8328_DACCONTROL3, mute_reg & ~4);
 
 	return 0;
 }
@@ -179,94 +170,22 @@ static int es8328_set_dai_fmt(struct snd_soc_dai *codec_dai,
 static int es8328_set_bias_level(struct snd_soc_codec *codec,
 				 enum snd_soc_bias_level level)
 {
-	u16 reg;
-
 	switch (level) {
 	case SND_SOC_BIAS_ON:
 	case SND_SOC_BIAS_PREPARE:
 	case SND_SOC_BIAS_STANDBY:
-//		if (codec->bias_level == SND_SOC_BIAS_OFF) {
-			/* Power everything up... */
-
-			// init first mutes
-			printk("*********now, init every register!\n");
-			snd_soc_write(codec, ES8328_MASTERMODE, 0xc0);   // 0x08
-			snd_soc_write(codec, ES8328_CHIPPOWER, 0xf3);  //0x02
-			snd_soc_write(codec, ES8328_CONTROL1 , 0x05);  //0x00
-
-			snd_soc_write(codec, ES8328_CONTROL2, 0x40);    // 0x01
-
-			/* Power down ADC */
-			snd_soc_write(codec, ES8328_ADCPOWER, 0xfc);
-
-			/* Power up LOUT2, and power down ROUT2 and xOUT1 */
-			snd_soc_write(codec, ES8328_DACPOWER,  0x48);    // 0x04
-
-			/* Set I2S to 16-bit mode */
-			snd_soc_write(codec, ES8328_DACCONTROL1, 0x18); //0x17
-
-			//snd_soc_write(codec, ES8328_DACCONTROL1, 0x20); //0x17
-
-			/* Frequency clock of 256 */
-			snd_soc_write(codec, ES8328_DACCONTROL2, 0x02); //0x18
-
-			/* No attenuation */
-			snd_soc_write(codec, ES8328_DACCONTROL4, 0x00); //0x1a
-			snd_soc_write(codec, ES8328_DACCONTROL5, 0x00); //0x1b
-
-			/* Set LIN2 for the output mixer */
-			snd_soc_write(codec, ES8328_DACCONTROL16, 0x09); //0x26
-
-
-
-			/* Point only the left DAC at the left mixer */
-			snd_soc_write(codec, ES8328_DACCONTROL17, 0x80); //0x27
-
-			/* Disable all other outputs */
-			snd_soc_write(codec, ES8328_DACCONTROL18, 0x00); //0x28
-			snd_soc_write(codec, ES8328_DACCONTROL19, 0x00); //0x29
-
-			snd_soc_write(codec, ES8328_DACCONTROL20, 0x00); //0x2a
-
-
-
-			/* Set mono mode for DACL, and mute DACR */
-			snd_soc_write(codec, ES8328_DACCONTROL7, 0x66);
-
-			snd_soc_write(codec, ES8328_DACCONTROL20, 0xb8); //0x2a
-
-			/* Power on the chip */
-			snd_soc_write(codec, ES8328_CHIPPOWER, 0x00); //0x02
-
-
-			/* Turn off muting */
-			snd_soc_write(codec, ES8328_DACCONTROL3, 0x30); //0x02
-			
-			/* Test values */
-/*
-			snd_soc_write(codec, 0, 0x00);   // 0x08
-			snd_soc_write(codec, 1, 0x01);   // 0x08
-			snd_soc_write(codec, 2, 0x02);   // 0x08
-			snd_soc_write(codec, 3, 0x03);   // 0x08
-			snd_soc_write(codec, 4, 0x04);   // 0x08
-			snd_soc_write(codec, 5, 0x05);   // 0x08
-			snd_soc_write(codec, 6, 0x06);   // 0x08
-*/
-//		}
 		break;
 
 	case SND_SOC_BIAS_OFF:
-		//snd_soc_write(codec, ES8328_DAC_PM, 0xc0);
 		break;
 	}
 	codec->bias_level = level;
 	return 0;
 }
 
-#define ES8328_RATES (SNDRV_PCM_RATE_8000_192000)
+#define ES8328_RATES (SNDRV_PCM_RATE_44100)
 
-#define ES8328_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S20_3LE |\
-	SNDRV_PCM_FMTBIT_S24_LE)
+#define ES8328_FORMATS (SNDRV_PCM_FMTBIT_S16_LE)
 
 static struct snd_soc_dai_ops es8328_dai_ops = {
 	.hw_params	= es8328_hw_params,
@@ -349,6 +268,54 @@ static int es8328_init(struct snd_soc_device *socdev,
 				ARRAY_SIZE(es8328_snd_controls));
 	es8328_add_widgets(codec);
 
+			snd_soc_write(codec, ES8328_MASTERMODE, 0xc0);
+			snd_soc_write(codec, ES8328_CHIPPOWER, 0xf3);
+			snd_soc_write(codec, ES8328_CONTROL1 , 0x05);
+
+			snd_soc_write(codec, ES8328_CONTROL2, 0x40);
+
+			/* Power down ADC */
+			snd_soc_write(codec, ES8328_ADCPOWER, 0xfc);
+
+			/* Power up LOUT2, and power down ROUT2 and xOUT1 */
+			snd_soc_write(codec, ES8328_DACPOWER,  0x48);
+
+			/* Set I2S to 16-bit mode */
+			snd_soc_write(codec, ES8328_DACCONTROL1, 0x18);
+
+			/* Frequency clock of 256 */
+			snd_soc_write(codec, ES8328_DACCONTROL2, 0x02);
+
+			/* No attenuation */
+			snd_soc_write(codec, ES8328_DACCONTROL4, 0x00);
+			snd_soc_write(codec, ES8328_DACCONTROL5, 0x00);
+
+			/* Set LIN2 for the output mixer */
+			snd_soc_write(codec, ES8328_DACCONTROL16, 0x09);
+
+
+
+			/* Point only the left DAC at the left mixer */
+			snd_soc_write(codec, ES8328_DACCONTROL17, 0x80);
+
+			/* Disable all other outputs */
+			snd_soc_write(codec, ES8328_DACCONTROL18, 0x00);
+			snd_soc_write(codec, ES8328_DACCONTROL19, 0x00);
+			snd_soc_write(codec, ES8328_DACCONTROL20, 0x00);
+
+
+
+			/* Set mono mode for DACL, and mute DACR */
+			snd_soc_write(codec, ES8328_DACCONTROL7, 0x66);
+
+			/* Power on the chip */
+			snd_soc_write(codec, ES8328_CHIPPOWER, 0x00);
+
+
+			/* Turn off muting */
+			snd_soc_write(codec, ES8328_DACCONTROL3, 0x30);
+			
+
 	return ret;
 
 err:
@@ -410,9 +377,6 @@ static struct i2c_driver es8328_i2c_driver = {
 static int es8328_add_i2c_device(struct platform_device *pdev,
 				 const struct es8328_setup_data *setup)
 {
-	//struct i2c_board_info info;
-	struct i2c_adapter *adapter;
-	struct i2c_client *client;
 	int ret;
 
 	ret = i2c_add_driver(&es8328_i2c_driver);
