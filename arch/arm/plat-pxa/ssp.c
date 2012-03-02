@@ -78,6 +78,7 @@ int ssp_write_word(struct ssp_dev *dev, u32 data)
 	struct ssp_device *ssp = dev->ssp;
 	int timeout = TIMEOUT;
 
+	printk(">>> Writing word 0x%08d to port SSP %d\n", data, ssp->port_id);
 	while (!(__raw_readl(ssp->mmio_base + SSSR) & SSSR_TNF)) {
 		if (!--timeout)
 			return -ETIMEDOUT;

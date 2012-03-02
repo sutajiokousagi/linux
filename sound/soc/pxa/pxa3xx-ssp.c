@@ -470,7 +470,7 @@ static struct snd_soc_dai_ops pxa3xx_ssp_dai_ops = {
 };
 
 struct snd_soc_dai pxa3xx_ssp_dai[] = {
-	{	.name = "pxa3xx-ssp1",
+	{	.name = "pxa168-ssp",
 		.id = 0,
 		.suspend = pxa3xx_ssp_suspend,
 		.resume = pxa3xx_ssp_resume,
@@ -486,7 +486,7 @@ struct snd_soc_dai pxa3xx_ssp_dai[] = {
 			.formats = PXA3XX_SSP_FORMATS,},
 		.ops = &pxa3xx_ssp_dai_ops,
 	},
-	{	.name = "pxa3xx-ssp2",
+	{	.name = "pxa168-ssp",
 		.id = 1,
 		.suspend = pxa3xx_ssp_suspend,
 		.resume = pxa3xx_ssp_resume,
@@ -502,7 +502,7 @@ struct snd_soc_dai pxa3xx_ssp_dai[] = {
 			.formats = PXA3XX_SSP_FORMATS,},
 			.ops = &pxa3xx_ssp_dai_ops,
 	},
-	{	.name = "pxa3xx-ssp3",
+	{	.name = "pxa168-ssp",
 		.id = 2,
 		.suspend = pxa3xx_ssp_suspend,
 		.resume = pxa3xx_ssp_resume,
@@ -518,7 +518,7 @@ struct snd_soc_dai pxa3xx_ssp_dai[] = {
 			.formats = PXA3XX_SSP_FORMATS,},
 			.ops = &pxa3xx_ssp_dai_ops,
 	},
-	{	.name = "pxa3xx-ssp4",
+	{	.name = "pxa168-ssp",
 		.id = 3,
 		.suspend = pxa3xx_ssp_suspend,
 		.resume = pxa3xx_ssp_resume,

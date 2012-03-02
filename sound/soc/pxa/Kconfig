@@ -186,6 +186,14 @@ config SND_PXA168_SOC_AVLite
 	help
 	  Say Y if you want to add support for SoC audio on AVLite
 
+config SND_PXA168_SOC_KOVAN
+	bool "SoC Audio support for Kovan"
+	depends on SND_PXA3XX_SOC && ARCH_MMP && MACH_KOVAN
+	select SND_PXA3XX_SOC_SSP
+	select SND_SOC_ES8328
+	help
+	  Say Y if you want to add support for SoC audio on Kovan
+
 config SND_PXA3XX_SOC_TETON_BGA
 	bool "SoC Audio support for Teton BGA"
 	depends on SND_PXA3XX_SOC && MACH_TETON_BGA

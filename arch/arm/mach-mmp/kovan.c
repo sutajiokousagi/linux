@@ -432,6 +432,11 @@ static struct platform_device kovan_fpga_device = {
 };
 
 
+static void kovan_power_off(void)
+{
+	while(1);
+}
+
 
 
 static void __init kovan_init(void)
@@ -485,6 +490,9 @@ static void __init kovan_init(void)
 	/* Add the LCD backlight */
 	platform_device_register(&pxa168_device_pwm0);
 	platform_device_register(&kovan_backlight_device);
+
+
+	pm_power_off = kovan_power_off;
 }
 
 

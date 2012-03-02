@@ -272,3 +272,6 @@ config SND_SOC_WM2000
 
 config SND_SOC_CS4344
 	tristate
+
+config SND_SOC_ES8328
+	tristate
