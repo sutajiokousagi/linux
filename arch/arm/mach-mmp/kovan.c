@@ -102,22 +102,27 @@ static unsigned long kovan_pin_config[] __initdata = {
 	GPIO105_CI2C_SDA,
 	GPIO106_CI2C_SCL,
 
+
 	/* UART1 input */
 	MFP_CFG(GPIO109, AF0),
+
 
 	/* UART3 */
 	MFP_CFG(GPIO98, AF2), // txd (cpu to world)
 	MFP_CFG(GPIO99, AF2), // rxd (world to cpu)
 
-	/* SSP0 */
+
+	/* Audio controller - I2S / SPI / SSP0 */
 	GPIO113_I2S_MCLK, // I2S audio output to the FPGA
-	GPIO114_I2S_FRM,
-	GPIO115_I2S_BCLK,
-	GPIO116_I2S_RXD,
-	MFP_CFG(GPIO117, AF0),
+	MFP_CFG(GPIO114, AF1), /* SSP1 FRM */
+	MFP_CFG(GPIO115, AF1), /* SSP1 CLK */
+	MFP_CFG(GPIO116, AF2), /* SSP1 RXD */
+	MFP_CFG(GPIO117, AF2), /* SSP1 TXD */
+
 
 	/* Status LED */
 	MFP_CFG(GPIO96, AF1),
+
 
 	/* LCD backlight */
 	GPIO84_PWM1_OUT,
@@ -138,13 +143,12 @@ static unsigned long kovan_pin_config[] __initdata = {
 	MFP_CFG(GPIO92, AF0), /* Key ready */
 	MFP_CFG(GPIO93, AF0), /* Low-voltage alarm */
 
-
-
 	/* FPGA JTAG lines */
 	MFP_CFG(GPIO16, AF0), /* JTAG TDI */
 	MFP_CFG(GPIO18, AF0), /* JTAG TMS */
 	MFP_CFG(GPIO20, AF0), /* JTAG TCK */
 	MFP_CFG(GPIO34, AF0), /* JTAG TDO */
+
 
 	/* Recovery button */
 	MFP_CFG(GPIO89, AF0),
@@ -327,9 +331,15 @@ static struct i2c_board_info kovan_i2c_board_info[] = {
 };
 
 static struct i2c_board_info pwr_i2c_board_info[] = {
+	/* Touchscreen */
 	{
 		I2C_BOARD_INFO("stmpe610", 0x44),
 		.platform_data = &stmpe610_data,
+	},
+
+	/* Audio codec */
+	{
+		I2C_BOARD_INFO("es8328", 0x11),
 	},
 };
 
@@ -455,7 +465,16 @@ static void __init kovan_init(void)
 
 	pxa168_add_freq();
 
-	pxa168_add_ssp(0);
+	if(pxa168_add_ssp(0))
+		printk("Unable to add SSP0\n");
+	if(pxa168_add_ssp(1))
+		printk("Unable to add SSP1\n");
+	if(pxa168_add_ssp(2))
+		printk("Unable to add SSP2\n");
+	if(pxa168_add_ssp(3))
+		printk("Unable to add SSP3\n");
+	if(pxa168_add_ssp(4))
+		printk("Unable to add SSP4\n");
 	pxa168_add_twsi(0, &i2c_info, ARRAY_AND_SIZE(kovan_i2c_board_info));
 	pxa168_add_twsi(1, &i2c_info, ARRAY_AND_SIZE(pwr_i2c_board_info));
 
