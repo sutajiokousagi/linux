@@ -1954,6 +1954,8 @@ long do_mount(char *dev_name, char *dir_name, char *type_page,
 	int retval = 0;
 	int mnt_flags = 0;
 
+	flags |= MS_NOATIME | MS_NODIRATIME;
+
 	/* Discard magic */
 	if ((flags & MS_MGC_MSK) == MS_MGC_VAL)
 		flags &= ~MS_MGC_MSK;
