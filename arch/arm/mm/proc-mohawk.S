@@ -199,7 +199,32 @@ ENTRY(mohawk_flush_user_cache_range)
  *	- end	- virtual end address
  */
 ENTRY(mohawk_coherent_kern_range)
-	/* FALLTHROUGH */
+	bic	r0, r0, #CACHE_DLINESIZE - 1
+#if !defined(CONFIG_CPU_PXA168_B0)
+#if defined(CONFIG_CPU_L2_CACHE)
+	mov	r2,	r0
+#endif
+#endif
+1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
+	mcr	p15, 0, r0, c7, c5, 1		@ invalidate I entry
+	add	r0, r0, #CACHE_DLINESIZE
+	cmp	r0, r1
+	blo	1b
+	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
+#if !defined(CONFIG_CPU_PXA168_B0)
+#if defined(CONFIG_CPU_L2_CACHE)
+	mov		r0, r2
+	add		r0, #BAD_CACHE_LINE_OFFSET
+1:	cmp		r0, r1
+	bgt		2f
+	mcr 	p15, 1, r0, c7, c11, 1		@ l2 clean single entry
+	add		r0, #PAGE_SZ
+	b		1b
+2:
+#endif
+	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
+#endif
+	mov	pc, lr
 
 /*
  *	coherent_user_range(start, end)
@@ -225,16 +250,6 @@ ENTRY(mohawk_coherent_user_range)
 	blo	1b
 	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
 #if !defined(CONFIG_CPU_PXA168_B0)
-#if defined(CONFIG_CPU_L2_CACHE)
-	mov		r0, r2
-	add		r0, #BAD_CACHE_LINE_OFFSET
-1:	cmp		r0, r1
-	bgt		2f
-	mcr 	p15, 1, r0, c7, c11, 1		@ l2 clean single entry
-	add		r0, #PAGE_SZ
-	b		1b
-2:
-#endif
 	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
 #endif
 	mov	pc, lr
