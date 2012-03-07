@@ -839,7 +839,7 @@ static int pxa168fb_blank(int blank, struct fb_info *info)
 {
 	struct pxa168fb_info *fbi = info->par;
 
-#ifdef CONFIG_PM
+#if defined(CONFIG_PM) && !defined(CONFIG_MACH_KOVAN)
 
 	pm_message_t mesg = PMSG_SUSPEND;
 
