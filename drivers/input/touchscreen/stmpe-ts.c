@@ -147,6 +147,10 @@ static irqreturn_t stmpe_ts_handler(int irq, void *data)
 	x = (data_set[0] << 4) | (data_set[1] >> 4);
 	y = ((data_set[1] & 0xf) << 8) | data_set[2];
 	z = data_set[3];
+#ifdef CONFIG_MACH_KOVAN
+	/* Y pins are mirrored on Kovan, meaning detection is upside-down */
+	y = XY_MASK - y;
+#endif
 
 	input_report_abs(ts->idev, ABS_X, x);
 	input_report_abs(ts->idev, ABS_Y, y);
