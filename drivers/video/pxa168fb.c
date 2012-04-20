@@ -560,7 +560,18 @@ static void set_dma_control0(struct pxa168fb_info *fbi)
 	 * Set bit to enable graphics DMA.
 	 */
 	x = readl(fbi->reg_base + LCD_SPU_DMA_CTRL0);
+#ifdef CONFIG_MACH_KOVAN
+	/* Some bug somewhere is causing fbi->active to tend towards 0.
+	 * It might be a GCC bug related to bitfields, and it might be
+	 * caused by some buffer stomping where it shouldn't.  Either
+	 * way, we always have the framebuffer active on this device,
+	 * so always assume the display is active.
+	 * 	- 20 Apr 2012 SMC
+	 */
+	x |= 0x00000100;
+#else
 	x |= fbi->active ? 0x00000100 : 0;
+#endif
 
 	/*
 	 * If we are in a pseudo-color mode, we need to enable
@@ -1351,6 +1362,18 @@ static int __init pxa168fb_probe(struct platform_device *pdev)
 
 	pxa168fb_power(fbi, mi, 1);
 
+
+#ifdef CONFIG_MACH_KOVAN
+	/* Copy the bootup logo from the bootloader's LCD to our LCD */
+	if (1) {
+                unsigned long old_fb1 = readl(fbi->reg_base + LCD_CFG_GRA_START_ADDR0);
+		unsigned long *old_fb1_virt = ioremap_wc(old_fb1, fbi->fb_size);
+		if (old_fb1_virt) {
+			memcpy(fbi->fb_start, old_fb1_virt, fbi->fb_size);
+			iounmap(old_fb1_virt);
+		}
+	}
+#endif
 
 #ifdef CONFIG_HAS_EARLYSUSPEND_0
 	/*
