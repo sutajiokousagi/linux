@@ -1228,6 +1228,7 @@ static int __init pxa168fb_probe(struct platform_device *pdev)
 	/*
 	 * Initialise static fb parameters.
 	 */
+	info->dev = &pdev->dev;
 	info->flags = FBINFO_DEFAULT | FBINFO_PARTIAL_PAN_OK |
 			FBINFO_HWACCEL_XPAN | FBINFO_HWACCEL_YPAN;
 	info->node = -1;
