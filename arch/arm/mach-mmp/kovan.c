@@ -143,6 +143,7 @@ static unsigned long kovan_pin_config[] __initdata = {
 	MFP_CFG(GPIO92, AF0), /* Key ready */
 	MFP_CFG(GPIO93, AF0), /* Low-voltage alarm */
 	MFP_CFG(GPIO79, AF0), /* Battery / ADC8 selection switch */
+	MFP_CFG(GPIO43, AF0), /* AC-present switch */
 
 	/* FPGA JTAG lines */
 	MFP_CFG(GPIO16, AF0), /* JTAG TDI */
