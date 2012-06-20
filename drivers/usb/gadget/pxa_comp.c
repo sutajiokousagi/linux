@@ -455,7 +455,6 @@ int comp_is_dev_busy(struct pxa3xx_comp *dev, struct usb_gadget_driver *driver)
 	if(dev->transceiver && dev->transceiver->default_a) {
 		printk(KERN_ERR "Mini-A connected!  "
 		       "please unplug it and insert module again!!!\n");
-		return 1;
 	}
 #endif
 #endif

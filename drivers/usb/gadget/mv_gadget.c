@@ -61,7 +61,6 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 *******************************************************************************/
- 
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/ioport.h>
@@ -448,6 +447,9 @@ int mv_debug = 1;
 #else
 int mv_debug = 0;
 #endif
+
+int gadget_counter;
+EXPORT_SYMBOL(gadget_counter);
 
 static void mvOsPrintf(const char *fmt, ...)
 {
@@ -1559,6 +1561,7 @@ int usb_gadget_unregister_driver (struct usb_gadget_driver *driver)
     unsigned long       flags = 0;
 
     /* Find USB Gadget device controller */
+    printk(KERN_ERR "Unregistering driver\n");
     for(dev_no=0; dev_no<mvCtrlUsbMaxGet(); dev_no++)
     {
 #ifndef CONFIG_USB_COMPOSITE

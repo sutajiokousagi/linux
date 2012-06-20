@@ -1299,6 +1299,7 @@ static struct usb_gadget_driver composite_driver = {
 	},
 };
 
+extern int gadget_counter;
 /**
  * usb_composite_register() - register a composite driver
  * @driver: the driver to register
@@ -1316,6 +1317,7 @@ static struct usb_gadget_driver composite_driver = {
  */
 int usb_composite_register(struct usb_composite_driver *driver)
 {
+	char class_name[32];
 	if (!driver || !driver->dev || !driver->bind || composite)
 		return -EINVAL;
 
@@ -1325,7 +1327,8 @@ int usb_composite_register(struct usb_composite_driver *driver)
 	composite_driver.driver.name = driver->name;
 	composite = driver;
 
-	driver->class = class_create(THIS_MODULE, "usb_composite");
+	snprintf(class_name, sizeof(class_name)-1, "usb_composite%d", gadget_counter++);
+	driver->class = class_create(THIS_MODULE, class_name);
 	if (IS_ERR(driver->class))
 		return PTR_ERR(driver->class);
 	driver->class->dev_uevent = composite_uevent;

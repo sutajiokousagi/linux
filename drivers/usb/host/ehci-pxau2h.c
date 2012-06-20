@@ -76,6 +76,16 @@ static int pxau2h_ehci_setup(struct usb_hcd *hcd)
 	return retval;
 }
 
+static int ehci_connect_ignore(struct usb_hcd *hcd, struct usb_device *udev)
+{
+	return 0;
+}
+
+static int ehci_disconnect_ignore(struct usb_hcd *hcd)
+{
+	return 0;
+}
+
 static const struct hc_driver pxau2h_ehci_hc_driver = {
 	.description = hcd_name,
 	.product_desc = "Marvell PXA SOC EHCI Host Controller",
@@ -121,6 +131,11 @@ static const struct hc_driver pxau2h_ehci_hc_driver = {
 
 	.relinquish_port = ehci_relinquish_port,
 	.port_handed_over = ehci_port_handed_over,
+
+#ifdef CONFIG_USB_OTG
+	.disconnect = ehci_disconnect_ignore,
+	.connect = ehci_connect_ignore,
+#endif
 };
 
 static int pxau2h_ehci_probe(struct platform_device *pdev)
