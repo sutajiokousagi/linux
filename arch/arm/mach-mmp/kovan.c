@@ -389,7 +389,16 @@ static struct pxasdh_platform_data kovan_sdh_platform_data_mmc3 = {
  */
 static int kovan_u2o_vbus_status(unsigned base)
 {
-	return 0;
+	int status = VBUS_LOW;
+
+	mdelay(2);
+	if (u2o_get(base, U2xOTGSC) & U2xOTGSC_BSV)
+		status = VBUS_HIGH;
+	else
+		status = VBUS_LOW;
+
+	return status;
+
 }
 
 static int kovan_u2o_vbus_set(int vbus_type)
@@ -418,12 +427,18 @@ struct otg_pmic_ops *init_kovan_otg_ops(void)
 	return &kovan_otg_ops;
 }
 
+static int kovan_usbid_detect(struct otg_transceiver *otg)
+{
+	return 1; /* OTG_B_DEVICE */
+}
+
 static struct pxa_usb_plat_info kovan_u2o_info = {
 	.phy_init	= pxa168_usb_phy_init,
 	.phy_deinit	= pxa168_usb_phy_deinit,
 	.vbus_set	= kovan_u2o_vbus_set,
 	.vbus_status	= kovan_u2o_vbus_status,
 	.init_pmic_ops	= (void *)init_kovan_otg_ops,
+	.usbid_detect	= kovan_usbid_detect,
 	.is_otg		= 1,
 };
 
