@@ -348,6 +348,7 @@ static struct i2c_board_info pwr_i2c_board_info[] = {
 
 static struct i2c_pxa_platform_data i2c_info __initdata = {
 	.use_pio		= 1,
+	.fast_mode              = 1,
 };
 
 
