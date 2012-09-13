@@ -24,6 +24,7 @@
 #include <linux/leds_pwm.h>
 #include <linux/pwm_backlight.h>
 #include <linux/gpio_keys.h>
+#include <linux/spi/spidev.h> //JBS
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -98,6 +99,18 @@ static unsigned long kovan_pin_config[] __initdata = {
 	MFP_CFG_DRV_PULL(GPIO83, AF1, FAST, LOW),
 
 
+	/* SPI bus */
+	// GPIO90 AF3 = SSP3_CLK   aka   SCLK   (currently used as the fpga clock  AF3)
+	// GPIO91 AF3 = SSP3_FRM   aka   CS	    (currently used as HPD report      AF0)
+	// GPIO92 AF3 = SSP3_RX    aka   MISO   (currently used as Key ready       AF0)
+	// GPIO93 AF3 = SSP3_TX    aka   MOSI   (currently used as LV alarm        AF0)
+	MFP_CFG(GPIO90, AF3), /* ssp3_clk */
+	MFP_CFG(GPIO91, AF3), /* ssp3_frm */
+	MFP_CFG(GPIO92, AF3), /* ssp3_miso */
+	MFP_CFG(GPIO93, AF3), /* ssp3_mosi */
+
+
+
 	/* I2C bus */
 	GPIO105_CI2C_SDA,
 	GPIO106_CI2C_SCL,
@@ -136,12 +149,14 @@ static unsigned long kovan_pin_config[] __initdata = {
 	/* FPGA programming SSPs */
 	MFP_CFG(GPIO118, AF1), /* ssp2_clk */
 	MFP_CFG(GPIO121, AF1), /* ssp2_txd */
-	MFP_CFG(GPIO90, AF3), /* ssp3_clk */
+
 
 	/* FPGA status GPIOs */
-	MFP_CFG(GPIO91, AF0), /* HPD report */
-	MFP_CFG(GPIO92, AF0), /* Key ready */
-	MFP_CFG(GPIO93, AF0), /* Low-voltage alarm */
+	//TODO: I don't see HPD, Key, and LV Alarm being used in the verilog code
+	//TODO: what about GPIO37?  the new fpga clock
+	//MFP_CFG(GPIO91, AF0),//MFP_CFG(GPIO38, AF0), //MFP_CFG(GPIO91, AF0), /* HPD report */
+	//MFP_CFG(GPIO92, AF0),//MFP_CFG(GPIO39, AF0), //MFP_CFG(GPIO92, AF0), /* Key ready */
+	//MFP_CFG(GPIO93, AF0),//MFP_CFG(GPIO40, AF0), //MFP_CFG(GPIO93, AF0), /* Low-voltage alarm */
 	MFP_CFG(GPIO79, AF0), /* Battery / ADC8 selection switch */
 	MFP_CFG(GPIO43, AF0), /* AC-present switch */
 
@@ -323,6 +338,21 @@ struct pxa168fb_mach_info kovan_lcd_ovly_info __initdata = {
 };
 
 
+/* SPI devices -JBS
+ *
+ * Based on the beagelbone example from:
+ *
+ *   http://communistcode.co.uk/blog/blogPost.php?blogPostID=1
+ */
+static struct spi_board_info kovan_spi3_info[] = {
+	{
+		.modalias = "spidev",
+		.max_speed_hz = 26000000, //26 Mbps, but the document says 52.  We need this to be exactly 26 to match the fpga clock it is providing
+		.bus_num = 2, //TODO: verify, SSP3 out of SSP1...SSP4, so it could be 2 (0-indexed) or 3 (1-indexed), I have seen people put .bus_num=0
+		.chip_select = 0, //TODO verify (FPGA_SYNC as CS?)
+		.mode = SPI_MODE_3, //TODO: verify this doesn't mess with i2c... my current fpga code assumes mode 3
+	},
+};
 
 
 /*
