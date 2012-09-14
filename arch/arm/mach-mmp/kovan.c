@@ -521,6 +521,13 @@ static void __init kovan_init(void)
 
  	pxa168_add_u2o(&kovan_u2o_info);
 
+    if(spi_register_board_info(kovan_spi3_info, ARRAY_SIZE(kovan_spi3_info))){
+    	printk"Error: Could not register SPI\n");
+    }else{
+    	printk("supposedly registered SPI\n");
+    }
+
+
 #ifdef CONFIG_USB_OTG
 	pxa168_add_u2ootg(&kovan_u2o_info);
 	pxa168_add_u2oehci(&kovan_u2o_info);

@@ -559,14 +559,6 @@ void fpga_init_hw(void) {
   __raw_writel(0xdeadbeef, SSP3_SSDR); // dummy write to trigger clock
   __raw_writel(0xdeadbeef, SSP3_SSDR); // dummy write to trigger clock
 
-  // bit 31:3 reserved (write 0, ignore on read)
-  // bit 2   (1=reset on (default), 0 = no reset)  APB+
-  // bit 1  reserved (write 0, ignore on read)
-  // bit 0  APBCLK  (1 = clock on, 0 = clock off (default)
-  //
-  // TODO:  APBCLK (GPIO37) = 0x01, but 0x05 may be correct (TODO)
-
-  // TODO: direction?
 
   
 
