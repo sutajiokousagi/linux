@@ -32,6 +32,11 @@ modules.builtin
 *.gcno
 
 #
+# Kernel config file: defconfig (AKA .config)
+#
+defconfig
+
+#
 # Top-level generic files
 #
 /tags

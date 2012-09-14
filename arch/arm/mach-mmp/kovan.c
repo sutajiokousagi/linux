@@ -100,10 +100,6 @@ static unsigned long kovan_pin_config[] __initdata = {
 
 
 	/* SPI bus */
-	// GPIO90 AF3 = SSP3_CLK   aka   SCLK   (currently used as the fpga clock  AF3)
-	// GPIO91 AF3 = SSP3_FRM   aka   CS	    (currently used as HPD report      AF0)
-	// GPIO92 AF3 = SSP3_RX    aka   MISO   (currently used as Key ready       AF0)
-	// GPIO93 AF3 = SSP3_TX    aka   MOSI   (currently used as LV alarm        AF0)
 	MFP_CFG(GPIO90, AF3), /* ssp3_clk */
 	MFP_CFG(GPIO91, AF3), /* ssp3_frm */
 	MFP_CFG(GPIO92, AF3), /* ssp3_miso */
@@ -152,11 +148,6 @@ static unsigned long kovan_pin_config[] __initdata = {
 
 
 	/* FPGA status GPIOs */
-	//TODO: I don't see HPD, Key, and LV Alarm being used in the verilog code
-	//TODO: what about GPIO37?  the new fpga clock
-	//MFP_CFG(GPIO91, AF0),//MFP_CFG(GPIO38, AF0), //MFP_CFG(GPIO91, AF0), /* HPD report */
-	//MFP_CFG(GPIO92, AF0),//MFP_CFG(GPIO39, AF0), //MFP_CFG(GPIO92, AF0), /* Key ready */
-	//MFP_CFG(GPIO93, AF0),//MFP_CFG(GPIO40, AF0), //MFP_CFG(GPIO93, AF0), /* Low-voltage alarm */
 	MFP_CFG(GPIO79, AF0), /* Battery / ADC8 selection switch */
 	MFP_CFG(GPIO43, AF0), /* AC-present switch */
 
