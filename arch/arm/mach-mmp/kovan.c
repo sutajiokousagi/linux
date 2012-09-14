@@ -25,6 +25,8 @@
 #include <linux/pwm_backlight.h>
 #include <linux/gpio_keys.h>
 #include <linux/spi/spidev.h> //JBS
+#include <linux/spi/spi.h> //JBS
+
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
