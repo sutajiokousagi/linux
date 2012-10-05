@@ -13,6 +13,7 @@
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
 #include <linux/i2c.h>
+#include <linux/spi/spi.h>
 #include <linux/smc91x.h>
 #include <linux/i2c/pca953x.h>
 #include <linux/card.h>
@@ -459,6 +460,54 @@ static struct platform_device kovan_fpga_device = {
 };
 
 
+/*
+ * SPI and associated interfaces
+ */
+
+static struct pxa2xx_spi_master pxa_ssp3_spi_master_info = {
+	.num_chipselect	= 1,
+	.enable_dma	= 1,
+};
+
+static struct pxa2xx_spi_master pxa_ssp4_spi_master_info = {
+	.num_chipselect	= 1,
+	.enable_dma	= 1,
+};
+
+struct platform_device pxa_spi_ssp3 = {
+	.name          = "pxa2xx-spi",
+	.id            = 3,
+	.dev           = {
+		.platform_data = &pxa_ssp3_spi_master_info,
+	},
+};
+
+struct platform_device pxa_spi_ssp4 = {
+	.name	= "pxa2xx-spi",
+	.id	= 4,
+	.dev	= {
+		.platform_data = &pxa_ssp4_spi_master_info,
+	},
+};
+
+static struct spi_board_info kovan_spi_board_info[] __initdata = {
+	{
+		.modalias	= "spidev",
+		.max_speed_hz	= 26000000,
+		.bus_num	= 3,
+		.chip_select	= 0,
+	},
+	{
+		.modalias	= "spidev",
+		.max_speed_hz	= 26000000,
+		.bus_num	= 4,
+		.chip_select	= 0,
+	},
+};
+
+
+
+
 static void kovan_power_off(void)
 {
 	while(1);
@@ -492,6 +541,12 @@ static void __init kovan_init(void)
 		printk("Unable to add SSP3\n");
 	if(pxa168_add_ssp(4))
 		printk("Unable to add SSP4\n");
+
+	spi_register_board_info(kovan_spi_board_info,
+		ARRAY_SIZE(kovan_spi_board_info));
+        platform_device_register(&pxa_spi_ssp3);
+        platform_device_register(&pxa_spi_ssp4);
+
 	pxa168_add_twsi(0, &i2c_info, ARRAY_AND_SIZE(kovan_i2c_board_info));
 	pxa168_add_twsi(1, &i2c_info, ARRAY_AND_SIZE(pwr_i2c_board_info));
 
