@@ -172,6 +172,9 @@ static APBC_CLK(twsi0, PXA168_TWSI0, 1, 33000000);
 static APBC_CLK(twsi1, PXA168_TWSI1, 1, 33000000);
 static APBC_CLK(ssp0,  PXA168_SSP0,  4, 0);
 static APBC_CLK(ssp1,  PXA168_SSP1,  0, 6500000);
+static APBC_CLK(ssp2,  PXA168_SSP2,  2, 26000000);
+static APBC_CLK(ssp3,  PXA168_SSP3,  2, 26000000);
+static APBC_CLK(ssp4,  PXA168_SSP4,  2, 26000000);
 static APBC_CLK(keypad, PXA168_KPC, 0, 32000);
 static APBC_PWM_CLK(pwm0, PXA168_PWM0, 1, 13000000);
 static APBC_PWM_CLK(pwm1, PXA168_PWM1, 1, 13000000);
@@ -204,6 +207,9 @@ static struct clk_lookup pxa168_clkregs[] = {
 	INIT_CLKREG(&clk_twsi1, "pxa2xx-i2c.1", NULL),
 	INIT_CLKREG(&clk_ssp0,  "pxa168-ssp.0", NULL),
 	INIT_CLKREG(&clk_ssp1,  "pxa168-ssp.1", NULL),
+	INIT_CLKREG(&clk_ssp2,  "pxa168-ssp.2", NULL),
+	INIT_CLKREG(&clk_ssp3,  "pxa168-ssp.3", NULL),
+	INIT_CLKREG(&clk_ssp4,  "pxa168-ssp.4", NULL),
 	INIT_CLKREG(&clk_keypad, "pxa27x-keypad", NULL),
 	INIT_CLKREG(&clk_pwm0, "pxa168-pwm.0", "PWMCLK"),
 	INIT_CLKREG(&clk_pwm1, "pxa168-pwm.1", "PWMCLK"),
