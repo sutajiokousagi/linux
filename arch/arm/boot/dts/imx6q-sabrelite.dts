@@ -109,6 +109,7 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_usbotg_1>;
 	disable-over-current;
+	otg_id_pin_select_change;
 	status = "okay";
 };
 

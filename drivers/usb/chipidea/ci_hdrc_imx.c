@@ -20,12 +20,18 @@
 #include <linux/usb/chipidea.h>
 #include <linux/clk.h>
 #include <linux/regulator/consumer.h>
+#include <linux/pinctrl/consumer.h>
+#include <linux/usb/of.h>
+#include <linux/regmap.h>
+#include <linux/mfd/syscon.h>
 
 #include "ci.h"
 #include "ci_hdrc_imx.h"
 
 #define pdev_to_phy(pdev) \
 	((struct usb_phy *)platform_get_drvdata(pdev))
+#define IOMUXC_IOMUXC_GPR1			0x00000004
+#define USB_OTG_ID_SEL_BIT			(1<<13)
 
 struct ci_hdrc_imx_data {
 	struct usb_phy *phy;
@@ -96,6 +102,7 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
 				  CI_HDRC_REGS_SHARED,
 	};
 	struct resource *res;
+	struct regulator *reg_vbus;
 	struct pinctrl *pinctrl;
 	int ret;
 
@@ -148,7 +155,7 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
 
 	reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
 	if (!IS_ERR(reg_vbus))
-		pdata->reg_vbus = reg_vbus;
+		pdata.reg_vbus = reg_vbus;
 
 	pdata.phy = data->phy;
 
@@ -165,6 +172,30 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
 			goto err_clk;
 		}
 	}
+
+#if IS_ENABLED(CONFIG_MFD_SYSCON)
+	/* Any imx6 user who needs to change id select pin, do below */
+	if (of_find_property(pdev->dev.of_node,
+				"otg_id_pin_select_change", NULL)) {
+		struct regmap *iomuxc_gpr;
+		u32 gpr1 = 0;
+
+		iomuxc_gpr = syscon_regmap_lookup_by_compatible
+			("fsl,imx6q-iomuxc-gpr");
+		if (!IS_ERR(iomuxc_gpr)) {
+			/* Select USB ID pin at iomuxc grp1 */
+			regmap_read(iomuxc_gpr, IOMUXC_IOMUXC_GPR1, &gpr1);
+			regmap_write(iomuxc_gpr, IOMUXC_IOMUXC_GPR1,
+					gpr1 | USB_OTG_ID_SEL_BIT);
+		} else {
+			ret = PTR_ERR(iomuxc_gpr);
+			dev_err(&pdev->dev,
+				"failed to find imx6q-iomuxc-gpr regmap:%d\n",
+				ret);
+			goto err_clk;
+		}
+	}
+#endif
 
 	data->ci_pdev = ci_hdrc_add_device(&pdev->dev,
 				pdev->resource, pdev->num_resources,

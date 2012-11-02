@@ -18,6 +18,11 @@ Optional properties:
 - vbus-supply: regulator for vbus
 - disable-over-current: disable over current detect
 - external-vbus-divider: enables off-chip resistor divider for Vbus
+- otg_id_pin_select_change: for platforms who have otg_id_pin selection
+(Currently, only imx6 has this selection), and need to change
+default value, please add this flag. Below is the pin selection for imx6q:
+	- ENET_RX_ER: 0  (defalt)
+	- GPIO_1: 1
 
 Examples:
 usb@02184000 { /* USB OTG */
@@ -28,4 +33,5 @@ usb@02184000 { /* USB OTG */
 	fsl,usbmisc = <&usbmisc 0>;
 	disable-over-current;
 	external-vbus-divider;
+	otg_id_pin_select_change;
 };
