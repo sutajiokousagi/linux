@@ -84,6 +84,7 @@ struct ci_hw_req {
 #ifdef CONFIG_USB_CHIPIDEA_UDC
 
 int ci_hdrc_gadget_init(struct ci_hdrc *ci);
+void ci_hdrc_gadget_destroy(struct ci_hdrc *ci);
 
 #else
 
@@ -91,7 +92,10 @@ static inline int ci_hdrc_gadget_init(struct ci_hdrc *ci)
 {
 	return -ENXIO;
 }
+static inline void ci_hdrc_gadget_destroy(struct ci_hdrc *ci)
+{
 
+}
 #endif
 
 #endif /* __DRIVERS_USB_CHIPIDEA_UDC_H */

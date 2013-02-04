@@ -97,6 +97,7 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
 				  CI_HDRC_DISABLE_STREAMING,
 	};
 	struct resource *res;
+	struct pinctrl *pinctrl;
 	int ret;
 
 	if (of_find_property(pdev->dev.of_node, "fsl,usbmisc", NULL)
@@ -114,6 +115,11 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Can't get device resources!\n");
 		return -ENOENT;
 	}
+
+	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+	if (IS_ERR(pinctrl))
+		dev_warn(&pdev->dev, "pinctrl get/select failed, err=%ld\n",
+			PTR_ERR(pinctrl));
 
 	data->clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(data->clk)) {

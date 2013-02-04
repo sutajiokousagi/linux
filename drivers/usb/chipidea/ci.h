@@ -134,6 +134,9 @@ struct hw_bank {
  * @hcd: pointer to usb_hcd for ehci host driver
  * @debugfs: root dentry for this controller in debugfs
  * @otg: for otg support
+ * @id_event: indicates there is a id event, and handled at ci_otg_work
+ * @b_sess_valid_event: indicates there is a vbus event, and handled
+ * at ci_otg_work
  */
 struct ci_hdrc {
 	struct device			*dev;
@@ -144,6 +147,7 @@ struct ci_hdrc {
 	enum ci_role			role;
 	bool				is_otg;
 	struct work_struct		work;
+	struct delayed_work		dwork;
 	struct workqueue_struct		*wq;
 
 	struct dma_pool			*qh_pool;
@@ -171,6 +175,8 @@ struct ci_hdrc {
 	struct usb_hcd			*hcd;
 	struct dentry			*debugfs;
 	struct usb_otg      		otg;
+	bool				id_event;
+	bool				b_sess_valid_event;
 };
 
 static inline struct ci_role_driver *ci_role(struct ci_hdrc *ci)
@@ -206,7 +212,6 @@ static inline void ci_role_stop(struct ci_hdrc *ci)
 
 	ci->roles[role]->stop(ci);
 }
-
 /******************************************************************************
  * REGISTERS
  *****************************************************************************/
