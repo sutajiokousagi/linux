@@ -462,7 +462,7 @@ static int _hardware_enqueue(struct ci_hw_ep *hwep, struct ci_hw_req *hwreq)
 		pages--;
 
 	if (rest == 0)
-		add_td_to_list(hwep, hwreq, 0);
+		
 
 	while (rest > 0) {
 		unsigned count = min(hwreq->req.length - hwreq->req.actual,
@@ -686,9 +686,6 @@ static int _gadget_stop_activity(struct usb_gadget *gadget)
 	usb_ep_fifo_flush(&ci->ep0out->ep);
 	usb_ep_fifo_flush(&ci->ep0in->ep);
 
-	if (ci->driver)
-		ci->driver->disconnect(gadget);
-
 	/* make sure to disable all endpoints */
 	gadget_for_each_ep(ep, gadget) {
 		usb_ep_disable(ep);
@@ -716,6 +713,11 @@ __releases(ci->lock)
 __acquires(ci->lock)
 {
 	int retval;
+
+	if (ci->gadget.speed != USB_SPEED_UNKNOWN) {
+		if (ci->driver)
+			ci->driver->disconnect(&ci->gadget);
+	}
 
 	spin_unlock(&ci->lock);
 	retval = _gadget_stop_activity(&ci->gadget);
@@ -1461,6 +1463,8 @@ static int ci_udc_vbus_session(struct usb_gadget *_gadget, int is_active)
 			hw_device_state(ci, ci->ep0out->qh.dma);
 			dev_dbg(ci->dev, "Connected to host\n");
 		} else {
+			if (ci->driver)
+				ci->driver->disconnect(&ci->gadget);
 			hw_device_state(ci, 0);
 			if (ci->platdata->notify_event)
 				ci->platdata->notify_event(ci,
@@ -1674,6 +1678,8 @@ static int ci_udc_stop(struct usb_gadget *gadget,
 		spin_lock_irqsave(&ci->lock, flags);
 		pm_runtime_put(&ci->gadget.dev);
 	}
+
+	ci->driver = NULL;
 
 	spin_unlock_irqrestore(&ci->lock, flags);
 
