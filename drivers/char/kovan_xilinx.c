@@ -367,7 +367,7 @@ void fpga_cleanup_module(void)
   gpio_direction_input(120);
   gpio_direction_input(97);
   gpio_direction_input(49);
-  gpio_direction_input(91);
+  gpio_direction_input(38);//gpio_direction_input(91); //HPD report
   gpio_direction_input(119);
 
 	/* Get rid of our char dev entries */
@@ -450,8 +450,10 @@ void fpga_init_hw(void) {
     MFP_CFG(GPIO120, AF0), // gpio -- fpga init
     MFP_CFG(GPIO121, AF1), // ssp2_txd
     MFP_CFG(GPIO97, AF0),  // gpio -- fpga_done
-    
-    MFP_CFG(GPIO90, AF3), // ssp2_clk
+   //Note:  HPD report MFP_CFG(GPIO_91, ...) missing
+   // which AF on GPIO 37 ?//
+    MFP_CFG(GPIO90, AF3), // ssp3_clk
+    MFP_CFG(GPIO37, AF0), // GPIO37 (nothing special yet, put into GPIO mode for APB clock)
   };
   mfp_config(ARRAY_AND_SIZE(pin_config));
   
@@ -472,15 +474,17 @@ void fpga_init_hw(void) {
   gpio_request(49, "VSync genlock");
   gpio_direction_input(49);
 
-  gpio_request(91, "HPD report");
-  gpio_direction_input(91);
+  gpio_request(38, "HPD report");//gpio_request(91, "HPD report");
+  gpio_direction_input(38);//gpio_direction_input(91);
 
   printk("SSP2 clock enable (26 MHz)\n");
   __raw_writel(0x23,(APB_VIRT_BASE + 0x15820));
   __raw_writel(0x27,(APB_VIRT_BASE + 0x15820)); // reset the unit
   __raw_writel(0x23,(APB_VIRT_BASE + 0x15820));
   
-  printk("SSP3 clock enable (26 MHz)\n" );
+  // FIXME: switch this to use GPIO37 !!!
+  printk("Need to set up fpga clock (26 MHz)... still using SSP3\n");
+  //printk("SSP3 clock enable (26 MHz)\n" );
   __raw_writel(0x23,(APB_VIRT_BASE + 0x1584c));
   __raw_writel(0x27,(APB_VIRT_BASE + 0x1584c)); // reset the unit
   __raw_writel(0x23,(APB_VIRT_BASE + 0x1584c));
@@ -546,14 +550,19 @@ void fpga_init_hw(void) {
 
   __raw_writel(0x00d000bf, SSP2_SSCR0);  // enable the port
 
+
+  // update for use of GPIO37 clock
   __raw_writel(0x001f0000, SSP3_SSPSP); // continuous clock on SSP3
   __raw_writel(0x01000000, SSP3_SSCR1); // this is actually a bizarre configuration
   __raw_writel(0x0010003f, SSP3_SSCR0); // but it works.
-  __raw_writel(0x001000ff, SSP3_SSCR0); 
+  __raw_writel(0x001000ff, SSP3_SSCR0);
   __raw_writel(0xdeadbeef, SSP3_SSDR); // dummy write to trigger clock
   __raw_writel(0xdeadbeef, SSP3_SSDR); // dummy write to trigger clock
 
+
   
+
+
   gpio_request(119, "FPGA reset (active low)");
   gpio_direction_output(119,1);
   gpio_set_value(119,0); // strobe low
