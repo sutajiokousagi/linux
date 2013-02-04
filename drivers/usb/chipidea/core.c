@@ -59,6 +59,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
+#include <linux/regulator/consumer.h>
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
 #include <linux/usb/otg.h>
@@ -365,17 +366,10 @@ static void ci_handle_id_switch(struct ci_hdrc *ci)
 		hw_device_reset(ci, USBMODE_CM_IDLE);
 
 		/* 2. Turn on/off vbus according to coming role */
-		if (role == CI_ROLE_GADGET) {
-			otg_set_vbus(&ci->otg, false);
+		if (role == CI_ROLE_GADGET)
 			/* wait vbus lower than OTGSC_BSV */
 			hw_wait_reg(ci, OP_OTGSC, OTGSC_BSV, 0,
 					CI_VBUS_STABLE_TIMEOUT);
-		} else if (role == CI_ROLE_HOST) {
-			otg_set_vbus(&ci->otg, true);
-			/* wait vbus higher than OTGSC_AVV */
-			hw_wait_reg(ci, OP_OTGSC, OTGSC_AVV, OTGSC_AVV,
-					CI_VBUS_STABLE_TIMEOUT);
-		}
 
 		/* 3. Begin the new role */
 		ci_role_start(ci, role);
@@ -417,17 +411,14 @@ static void ci_delayed_work(struct work_struct *work)
 	struct delayed_work *dwork = to_delayed_work(work);
 	struct ci_hdrc *ci = container_of(dwork, struct ci_hdrc, dwork);
 
+	/*
+	 * If it is gadget mode, the vbus operation should be done like below:
+	 * 1. Enable vbus detect
+	 * 2. If it has already connected to host, notify udc
+	 */
 	if (ci->role == CI_ROLE_GADGET) {
-		/*
-		 * if it is device mode:
-		 * - Enable vbus detect
-		 * - If it has already connected to host, notify udc
-		 */
 		ci_enable_otg_interrupt(ci, OTGSC_BSVIE);
 		ci_handle_vbus_change(ci);
-	} else if (ci->is_otg && (ci->role == CI_ROLE_HOST)) {
-		/* USB Device at the MicroB to A cable */
-		otg_set_vbus(&ci->otg, true);
 	}
 }
 
@@ -568,6 +559,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
 
 	ci->dev = dev;
 	ci->platdata = dev->platform_data;
+	ci->reg_vbus = ci->platdata->reg_vbus;
 	if (ci->platdata->phy)
 		ci->transceiver = ci->platdata->phy;
 	else

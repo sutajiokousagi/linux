@@ -20,9 +20,10 @@ struct ci_hdrc_platform_data {
 #define CI_HDRC_REQUIRE_TRANSCEIVER	BIT(1)
 #define CI_HDRC_DISABLE_STREAMING	BIT(3)
 	enum usb_dr_mode	dr_mode;
-#define CI_HDRC_CONTROLLER_RESET_EVENT		0
-#define CI_HDRC_CONTROLLER_STOPPED_EVENT	1
+#define CI_HDRC_CONTROLLER_RESET_EVENT          0
+#define CI_HDRC_CONTROLLER_STOPPED_EVENT        1
 	void	(*notify_event) (struct ci_hdrc *ci, unsigned event);
+	struct regulator *reg_vbus;
 };
 
 /* Default offset of capability registers */
