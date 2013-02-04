@@ -16,6 +16,7 @@
 #include <linux/list.h>
 #include <linux/irqreturn.h>
 #include <linux/usb.h>
+#include <linux/usb/otg.h>
 #include <linux/usb/gadget.h>
 
 /******************************************************************************
@@ -132,6 +133,7 @@ struct hw_bank {
  * @transceiver: pointer to USB PHY, if any
  * @hcd: pointer to usb_hcd for ehci host driver
  * @debugfs: root dentry for this controller in debugfs
+ * @otg: for otg support
  */
 struct ci_hdrc {
 	struct device			*dev;
@@ -168,6 +170,7 @@ struct ci_hdrc {
 	struct usb_phy			*transceiver;
 	struct usb_hcd			*hcd;
 	struct dentry			*debugfs;
+	struct usb_otg      		otg;
 };
 
 static inline struct ci_role_driver *ci_role(struct ci_hdrc *ci)
