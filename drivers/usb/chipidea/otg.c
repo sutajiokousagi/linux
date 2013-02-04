@@ -17,18 +17,18 @@
 #include "ci.h"
 #include "bits.h"
 
-void ci_clear_otg_interrupt(struct ci13xxx *ci, u32 bits)
+void ci_clear_otg_interrupt(struct ci_hdrc *ci, u32 bits)
 {
 	/* Only clear request bits */
 	hw_write(ci, OP_OTGSC, OTGSC_INT_STATUS_BITS, bits);
 }
 
-void ci_enable_otg_interrupt(struct ci13xxx *ci, u32 bits)
+void ci_enable_otg_interrupt(struct ci_hdrc *ci, u32 bits)
 {
 	hw_write(ci, OP_OTGSC, bits, bits);
 }
 
-void ci_disable_otg_interrupt(struct ci13xxx *ci, u32 bits)
+void ci_disable_otg_interrupt(struct ci_hdrc *ci, u32 bits)
 {
 	hw_write(ci, OP_OTGSC, bits, 0);
 }

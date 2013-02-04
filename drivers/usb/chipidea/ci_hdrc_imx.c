@@ -93,8 +93,8 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
 		.name		= "ci_hdrc_imx",
 		.capoffset	= DEF_CAPOFFSET,
 		.flags		= CI_HDRC_REQUIRE_TRANSCEIVER |
-				  CI_HDRC_PULLUP_ON_VBUS |
-				  CI_HDRC_DISABLE_STREAMING,
+				  CI_HDRC_DISABLE_STREAMING |
+				  CI_HDRC_REGS_SHARED,
 	};
 	struct resource *res;
 	struct pinctrl *pinctrl;

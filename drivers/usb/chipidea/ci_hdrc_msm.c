@@ -49,7 +49,6 @@ static struct ci_hdrc_platform_data ci_hdrc_msm_platdata = {
 	.name			= "ci_hdrc_msm",
 	.flags			= CI_HDRC_REGS_SHARED |
 				  CI_HDRC_REQUIRE_TRANSCEIVER |
-				  CI_HDRC_PULLUP_ON_VBUS |
 				  CI_HDRC_DISABLE_STREAMING,
 
 	.notify_event		= ci_hdrc_msm_notify_event,
@@ -96,5 +95,4 @@ static struct platform_driver ci_hdrc_msm_driver = {
 module_platform_driver(ci_hdrc_msm_driver);
 
 MODULE_ALIAS("platform:msm_hsusb");
-MODULE_ALIAS("platform:ci13xxx_msm");
 MODULE_LICENSE("GPL v2");
