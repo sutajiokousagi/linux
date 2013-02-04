@@ -85,8 +85,10 @@ static int hw_device_state(struct ci_hdrc *ci, u32 dma)
 		/* interrupt, error, port change, reset, sleep/suspend */
 		hw_write(ci, OP_USBINTR, ~0,
 			     USBi_UI|USBi_UEI|USBi_PCI|USBi_URI|USBi_SLI);
+		hw_write(ci, OP_USBCMD, USBCMD_RS, USBCMD_RS);
 	} else {
 		hw_write(ci, OP_USBINTR, ~0, 0);
+		hw_write(ci, OP_USBCMD, USBCMD_RS, 0);
 	}
 	return 0;
 }
@@ -1512,10 +1514,14 @@ static int ci_udc_pullup(struct usb_gadget *_gadget, int is_on)
 {
 	struct ci_hdrc *ci = container_of(_gadget, struct ci_hdrc, gadget);
 
+	if ((ci->platdata->flags & CI_HDRC_PULLUP_ON_VBUS) &&
+			!ci->vbus_active)
+		return -EPERM;
+
 	if (is_on)
-		hw_write(ci, OP_USBCMD, USBCMD_RS, USBCMD_RS);
+		hw_device_state(ci, ci->ep0out->qh.dma);
 	else
-		hw_write(ci, OP_USBCMD, USBCMD_RS, 0);
+		hw_device_state(ci, 0);
 
 	return 0;
 }
@@ -1846,7 +1852,7 @@ free_qh_pool:
 	return retval;
 }
 
-static int udc_id_switch_for_device(struct ci13xxx *ci)
+static int udc_id_switch_for_device(struct ci_hdrc *ci)
 {
 	ci_clear_otg_interrupt(ci, OTGSC_BSVIS);
 	ci_enable_otg_interrupt(ci, OTGSC_BSVIE);
@@ -1854,7 +1860,7 @@ static int udc_id_switch_for_device(struct ci13xxx *ci)
 	return 0;
 }
 
-static void udc_id_switch_for_host(struct ci13xxx *ci)
+static void udc_id_switch_for_host(struct ci_hdrc *ci)
 {
 	/* host doesn't care B_SESSION_VALID event */
 	ci_clear_otg_interrupt(ci, OTGSC_BSVIS);
