@@ -116,6 +116,16 @@
 					};
 				};
 
+				ecspi3 {
+					pinctrl_ecspi3_1: ecspi3grp-1 {
+						fsl,pins = <
+							526 0x100b1	/* MX6Q_PAD_DISP0_DAT2__ECSPI3_MISO */
+							518 0x100b1	/* MX6Q_PAD_DISP0_DAT1__ECSPI3_MOSI */
+							511 0x100b1	/* MX6Q_PAD_DISP0_DAT0__ECSPI3_SCLK */
+						>;
+					};
+				};
+
 				enet {
 					pinctrl_enet_1: enetgrp-1 {
 						fsl,pins = <
