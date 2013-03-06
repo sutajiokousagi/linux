@@ -148,7 +148,6 @@ struct ci_hdrc {
 	enum ci_role			role;
 	bool				is_otg;
 	struct work_struct		work;
-	struct delayed_work		dwork;
 	struct workqueue_struct		*wq;
 
 	struct dma_pool			*qh_pool;

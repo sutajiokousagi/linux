@@ -406,22 +406,6 @@ static void ci_otg_work(struct work_struct *work)
 	enable_irq(ci->irq);
 }
 
-static void ci_delayed_work(struct work_struct *work)
-{
-	struct delayed_work *dwork = to_delayed_work(work);
-	struct ci_hdrc *ci = container_of(dwork, struct ci_hdrc, dwork);
-
-	/*
-	 * If it is gadget mode, the vbus operation should be done like below:
-	 * 1. Enable vbus detect
-	 * 2. If it has already connected to host, notify udc
-	 */
-	if (ci->role == CI_ROLE_GADGET) {
-		ci_enable_otg_interrupt(ci, OTGSC_BSVIE);
-		ci_handle_vbus_change(ci);
-	}
-}
-
 static inline void ci_role_destroy(struct ci_hdrc *ci)
 {
 	ci_hdrc_gadget_destroy(ci);
@@ -580,7 +564,6 @@ static int ci_hdrc_probe(struct platform_device *pdev)
 	}
 
 	INIT_WORK(&ci->work, ci_otg_work);
-	INIT_DELAYED_WORK(&ci->dwork, ci_delayed_work);
 	ci->wq = create_singlethread_workqueue("ci_otg");
 	if (!ci->wq) {
 		dev_err(dev, "can't create workqueue\n");
@@ -646,8 +629,9 @@ static int ci_hdrc_probe(struct platform_device *pdev)
 	if (ret)
 		goto stop;
 
-	/* Defer some operations */
-	queue_delayed_work(ci->wq, &ci->dwork, msecs_to_jiffies(200));
+	/* If it is connected to host, tell gadget the connection */
+	if (ci->role == CI_ROLE_GADGET)
+		ci_handle_vbus_change(ci);
 
 	ret = dbg_create_files(ci);
 	if (!ret)
