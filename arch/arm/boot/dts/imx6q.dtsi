@@ -289,6 +289,11 @@
 							MX6Q_PAD_ENET_RX_ER__USB_OTG_ID 0x17059
 						>;
 					};
+					pinctrl_usbotg_2: usbotggrp-2 {
+						fsl,pins = <
+							1591 0x17059	/* MX6Q_PAD_ENET_RX_ER__ANATOP_USBOTG_ID */
+						>;
+					};
 				};
 
 				usdhc2 {
