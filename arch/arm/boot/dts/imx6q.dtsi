@@ -198,6 +198,7 @@
 				i2c1 {
 					pinctrl_i2c1_1: i2c1grp-1 {
 						fsl,pins = <
+<<<<<<< HEAD
 							MX6Q_PAD_EIM_D21__I2C1_SCL 0x4001b8b1
 							MX6Q_PAD_EIM_D28__I2C1_SDA 0x4001b8b1
 						>;
@@ -225,8 +226,8 @@
 				i2c2 {
 					pinctrl_i2c2_1: i2c2grp-1 {
 						fsl,pins = <
-							91  0x4001b8b1	/* MX6Q_PAD_EIM_EB2__I2C2_SCL / ALT6 */
-							99  0x4001b8b1	/* MX6Q_PAD_EIM_D16__I2C2_SDA / ALT6 */
+							91  0x4001b848	/* MX6Q_PAD_EIM_EB2__I2C2_SCL / ALT6 */
+							99  0x4001b848	/* MX6Q_PAD_EIM_D16__I2C2_SDA / ALT6 */
 						>;
 					};
 				};
@@ -234,8 +235,8 @@
 				i2c3 {
 					pinctrl_i2c3_1: i2c3grp-1 {
 						fsl,pins = <
-							106 0x4001b8b1	/* MX6Q_PAD_EIM_D17__I2C3_SCL / ALT6 */
-							114 0x4001b8b1	/* MX6Q_PAD_EIM_D18__I2C3_SDA / ALT6 */
+							106 0x4001b848	/* MX6Q_PAD_EIM_D17__I2C3_SCL / ALT6 */
+							114 0x4001b848	/* MX6Q_PAD_EIM_D18__I2C3_SDA / ALT6 */
 						>;
 					};
 				};
