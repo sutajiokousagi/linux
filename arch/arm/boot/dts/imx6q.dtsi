@@ -269,6 +269,15 @@
 					};
 				};
 
+				uart3 {
+					pinctrl_uart3_1: uart3grp-1 {
+						fsl,pins = <
+							165 0x1b0b1	/* MX6Q_PAD_EIM_D24__UART3_TXD */
+							173 0x1b0b1	/* MX6Q_PAD_EIM_D25__UART3_RXD */
+						>;
+					};
+				};
+
 				uart4 {
 					pinctrl_uart4_1: uart4grp-1 {
 						fsl,pins = <
