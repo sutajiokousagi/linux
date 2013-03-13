@@ -40,6 +40,7 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_DA7213 if I2C
 	select SND_SOC_DA732X if I2C
 	select SND_SOC_DA9055 if I2C
+	select SND_SOC_ES8328 if I2C
 	select SND_SOC_DFBMCS320
 	select SND_SOC_ISABELLE if I2C
 	select SND_SOC_JZ4740_CODEC
@@ -267,6 +268,9 @@ config SND_SOC_DFBMCS320
 	tristate
 
 config SND_SOC_DMIC
+	tristate
+
+config SND_SOC_ES8328
 	tristate
 
 config SND_SOC_ISABELLE
