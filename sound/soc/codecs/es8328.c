@@ -355,7 +355,7 @@ static int es8328_adc_enable(struct snd_soc_codec *codec)
 static int es8328_dac_enable(struct snd_soc_codec *codec)
 {
 	/* Power up LOUT2 ROUT2, and power down xOUT1 */
-	snd_soc_write(codec, ES8328_DACPOWER,  0x0c);
+	snd_soc_write(codec, ES8328_DACPOWER,  0x3c);
 
 	/* Set I2S to 16-bit mode */
 	snd_soc_write(codec, ES8328_DACCONTROL1, 0x18);
