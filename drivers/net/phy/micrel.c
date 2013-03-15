@@ -45,6 +45,14 @@
 #define	KSZPHY_INTCS_ALL			(KSZPHY_INTCS_LINK_UP |\
 						KSZPHY_INTCS_LINK_DOWN)
 
+/* Write/read to/from extended registers */
+#define MII_KSZPHY_EXTREG			0x0b
+#define KSZPHY_EXTREG_WRITE			0x8000
+
+#define MII_KSZPHY_EXTREG_WRITE			0x0c
+#define MII_KSZPHY_EXTREG_READ			0x0d
+
+
 /* general PHY control reg in vendor specific block. */
 #define	MII_KSZPHY_CTRL			0x1F
 /* bitmap of PHY register to set interrupt mode */
