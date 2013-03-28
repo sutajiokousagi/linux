@@ -245,8 +245,6 @@
 	codec: es8328@11 {
 		compatible = "everest,es8328";
 		reg = <0x11>;
-//		VDDA-supply = <&reg_2p5v>;
-//		VDDIO-supply = <&reg_3p3v>;
 	};
 };
 
@@ -270,6 +268,47 @@
 	disable-endpoint = <&gpio2 16 0>;
 	status = "okay";
 };
+
+&ldb {
+	fsl,dual-channel;
+	status = "okay";
+        lvds-channel@0 {
+		fsl,data-mapping = "jeida";
+		fsl,data-width = <24>;
+		status = "okay";
+                display-timings {
+			2560x1700p50 {
+				clock-frequency = <200000000>;
+				hactive = <2560>;
+				vactive = <1700>;
+				hback-porch = <80>;
+				hfront-porch = <48>;
+				hsync-len = <32>;
+				vback-porch = <36>;
+				vfront-porch = <3>;
+				vsync-len = <10>;
+				hsync-active = <1>;
+				vsync-active = <1>;
+			};
+			/*
+			1280x720p50 {
+				clock-frequency = <74176000>;
+				hactive = <1280>;
+				vactive = <720>;
+				hback-porch = <110>;
+				hfront-porch = <220>;
+				hsync-len = <40>;
+				vback-porch = <20>;
+				vfront-porch = <5>;
+				vsync-len = <5>;
+				hsync-active = <1>;
+				vsync-active = <1>;
+			};
+			*/
+                };
+        };
+};
+
 
 /*
 &caam {
