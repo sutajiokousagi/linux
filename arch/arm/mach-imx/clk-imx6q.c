@@ -570,6 +570,9 @@ int __init mx6q_clocks_init(void)
 	if (IS_ENABLED(CONFIG_SATA_AHCI_PLATFORM)) 
 		clk_prepare_enable(clk[sata_ref_100m]); 
 
+	if (IS_ENABLED(CONFIG_SATA_AHCI_PLATFORM)) 
+		clk_prepare_enable(clk[pcie_ref_125m]); 
+
 	/* Set initial power mode */
 	imx6q_set_lpm(WAIT_CLOCKED);
 
