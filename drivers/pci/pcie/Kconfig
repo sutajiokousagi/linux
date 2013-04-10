@@ -83,3 +83,14 @@ endchoice
 config PCIE_PME
 	def_bool y
 	depends on PCIEPORTBUS && PM_RUNTIME
+
+
+#
+# Platform driver for i.MX6
+#
+config PCIE_IMX
+	bool "Support for i.MX6" 
+	depends on SOC_IMX6Q
+	help
+	  Enable support for the 1x PCI Express bus on the Freescale i.MX6
+	depends on PCIEPORTBUS && PM_RUNTIME

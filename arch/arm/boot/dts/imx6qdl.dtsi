@@ -655,14 +655,14 @@
 			};
 
 			pcie: pcie@01ffc000 {
-				compatible = "fsl,mx6q-pcie";
-				reg = <0x01ffc000 0x4000>, // config + regs
-				      <0x01000000 0x100000>, // IORESOURCE_IO
-				      <0x01100000 0xe00000>, // IORESOURCE_MEM
-				      <0x01f00000 0xfc000>; // Base address
+				compatible = "fsl,imx6q-pcie";
+				reg = <0x01ffc000 0x4000>,
+				      <0x01000000 0x100000>,
+				      <0x01100000 0xe00000>,
+				      <0x01f00000 0xfc000>;
 				interrupts = <0 122 0x04>;
-				clocks = <&clks 188>, <&clks 189>, <&clks 44>, <&clks 144>;
-				clock-names = "pcie_ref", "pcie_ref_125m", "pcie_axi_sel", "pcie_axi";
+				clocks = <&clks 186>, <&clks 189>, <&clks 193>, <&clks 195>, <&clks 144>;
+				clock-names = "sata_ref", "pcie_ref_125m", "lvds1_sel", "lvds1", "pcie_axi";
 				status = "disabled";
 			};
 
