@@ -305,6 +305,7 @@ fec_enet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	/* Set buffer length and buffer pointer */
 	bufaddr = skb->data;
 	bdp->cbd_datlen = skb->len;
+	ndev->stats.tx_bytes += skb->len;
 
 	/*
 	 * On some FEC implementations data must be aligned on
