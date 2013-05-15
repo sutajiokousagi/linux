@@ -203,7 +203,7 @@ static const char *vdo_axi_sels[]	= { "axi", "ahb", };
 static const char *vpu_axi_sels[]	= { "axi", "pll2_pfd2_396m", "pll2_pfd0_352m", };
 static const char *cko1_sels[]	= { "pll3_usb_otg", "pll2_bus", "pll1_sys", "pll5_video_div",
 				    "dummy", "axi", "enfc", "ipu1_di0", "ipu1_di1", "ipu2_di0",
-				    "ipu2_di1", "ahb", "ipg", "ipg_per", "ckil", "pll4_post_div", };
+				    "ipu2_di1", "ahb", "ipg", "ipg_per", "ckil", "pll4_audio", };
 static const char *lvds1_sels[] = { "dummy", "dummy", "dummy", "dummy", "dummy", "dummy", "pll4_audio", "pll5_video", "pll8_mlb", "enet_ref", "pcie_ref", "sata_ref", "dummy", "dummy", "dummy", "dummy", "dummy", "dummy", "dummy", "lvds1", "lvds2", };
 static const char *lvds2_sels[] = { "dummy", "dummy", "dummy", "dummy", "dummy", "dummy", "pll4_audio", "pll5_video", "pll8_mlb", "enet_ref", "pcie_ref", "sata_ref", "dummy", "dummy", "dummy", "dummy", "dummy", "dummy", "dummy", "lvds1", "lvds2", };
 
@@ -574,6 +574,9 @@ int __init mx6q_clocks_init(void)
 		clk_prepare_enable(clk[usbphy1_gate]);
 		clk_prepare_enable(clk[usbphy2_gate]);
 	}
+
+	if (IS_ENABLED(CONFIG_SATA_AHCI_PLATFORM)) 
+		clk_prepare_enable(clk[pcie_ref_125m]); 
 
 	/* Set initial power mode */
 	imx6q_set_lpm(WAIT_CLOCKED);
