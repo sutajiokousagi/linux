@@ -251,8 +251,9 @@ static int imx_pcie_set_power(void *data, bool blocked)
 {
 	struct imx_pcie_port *pp = data;
 
-	if (gpio_is_valid(pp->pcie_dis))
+	if (gpio_is_valid(pp->pcie_dis)) {
 		gpio_set_value(pp->pcie_dis, !blocked);
+	}
 	return 0;
 }
 
@@ -394,16 +395,20 @@ static int imx_pcie_link_up(struct platform_device *pdev)
 					0x0000);
 		}
 
-		if ((iterations <= 0))
-			dev_info(&pdev->dev,
+	}
+
+	if (!rc) {
+		if (iterations <= 0) {
+			dev_err(&pdev->dev,
 				"link up failed, DB_R0:0x%08x, DB_R1:0x%08x!\n",
 				readl(pp->dbi_base + DB_R0),
 				readl(pp->dbi_base + DB_R1));
+			return -ETIMEDOUT;
+		}
+		return -ENODEV;
 	}
 
-	if (!rc)
-		return 0;
-	return 1;
+	return 0;
 }
 
 static int imx_pcie_regions_setup(struct platform_device *pdev,
@@ -446,7 +451,6 @@ static int imx_pcie_regions_setup(struct platform_device *pdev,
 	writel(0, dbi_base + PCIE_PL_iATURUTA);
 	writel(CfgRdWr0, dbi_base + PCIE_PL_iATURC1);
 	writel((1<<31), dbi_base + PCIE_PL_iATURC2);
-
 
 	return 0;
 }
@@ -702,7 +706,7 @@ static int pcie_phy_cr_write(void __iomem *dbi_base, int addr, int data)
 	temp_wr_data = 0x0 ;
 	writel(temp_wr_data, dbi_base + PHY_CTRL_R);
 
-	return 1 ;
+	return 1;
 }
 
 static void change_field(int *in, int start, int end, int val)
@@ -721,9 +725,7 @@ static int imx_pcie_enable_controller(struct platform_device *pdev)
 	gpio_set_value(pp->pcie_pwr_en, 1);
 
 	imx_pcie_clrset(pp, iomuxc_gpr1_test_powerdown, 0 << 18, IOMUXC_GPR1);
-
 	imx_pcie_clrset(pp, iomuxc_gpr1_pcie_ref_clk_en, 1 << 16, IOMUXC_GPR1);
-
 
 	/* Enable clocks */
 	ret = clk_set_parent(pp->lvds1_sel, pp->sata_ref);
@@ -768,27 +770,25 @@ static void card_reset(struct platform_device *pdev)
 	gpio_set_value(pp->pcie_rst, 1);
 }
 
-static void __init add_pcie_port(struct platform_device *pdev)
+static int __init add_pcie_port(struct platform_device *pdev)
 {
-	struct clk *pcie_clk;
+	struct device *dev = &pdev->dev;
 	struct imx_pcie_port *pp = platform_get_drvdata(pdev);
+	int ret;
 
-	if (imx_pcie_link_up(pdev)) {
-		pr_info("IMX PCIe port: link up.\n");
-		pp->index = 0;
-		pp->root_bus_nr = -1;
-		spin_lock_init(&pp->conf_lock);
-	} else {
-		struct device *dev = &pdev->dev;
-		pr_info("IMX PCIe port: link down!\n");
+	ret = imx_pcie_link_up(pdev);
+	if (ret) {
+		dev_info(dev, "IMX PCIe port: link down!\n");
 		/* Release the clocks, and disable the power */
 
-		pcie_clk = of_clk_get(dev->of_node, 0);
-		if (IS_ERR(pcie_clk))
-			pr_err("no pcie clock.\n");
+		clk_disable(pp->pcie_axi);
+		clk_put(pp->pcie_axi);
 
-		clk_disable(pcie_clk);
-		clk_put(pcie_clk);
+		clk_disable(pp->lvds1);
+		clk_put(pp->lvds1);
+
+		clk_put(pp->pcie_ref_125m);
+		clk_put(pp->sata_ref);
 
 		imx_pcie_clrset(pp, iomuxc_gpr1_pcie_ref_clk_en, 0 << 16,
 				IOMUXC_GPR1);
@@ -798,7 +798,15 @@ static void __init add_pcie_port(struct platform_device *pdev)
 
 		imx_pcie_clrset(pp, iomuxc_gpr1_test_powerdown, 1 << 18,
 				IOMUXC_GPR1);
+
+		return ret;
 	}
+
+	dev_info(dev, "IMX PCIe port: link up.\n");
+	pp->index = 0;
+	pp->root_bus_nr = -1;
+	spin_lock_init(&pp->conf_lock);
+	return 0;
 }
 
 
@@ -856,7 +864,7 @@ static int __init imx_pcie_pltfm_probe(struct platform_device *pdev)
                                 "disable-endpoint", 0);
         if (gpio_is_valid(pp->pcie_dis))
                 devm_gpio_request_one(dev, pp->pcie_dis,
-                                    GPIOF_OUT_INIT_LOW,
+                                    GPIOF_OUT_INIT_HIGH,
                                     "PCIe disable endpoint");
 
 
@@ -908,41 +916,46 @@ static int __init imx_pcie_pltfm_probe(struct platform_device *pdev)
 	if (IS_ERR(pp->lvds1_sel)) {
 		dev_err(dev,
 			"lvds1_sel clock missing or invalid\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_out;
 	}
 
 	pp->lvds1 = clk_get(dev, "lvds1");
 	if (IS_ERR(pp->lvds1)) {
 		dev_err(dev,
 			"lvds1 clock select missing or invalid\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_out;
 	}
 
 	pp->pcie_ref_125m = clk_get(dev, "pcie_ref_125m");
 	if (IS_ERR(pp->pcie_ref_125m)) {
 		dev_err(dev,
 			"pcie_ref_125m clock source missing or invalid\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_out;
 	}
 
 	pp->pcie_axi = clk_get(dev, "pcie_axi");
 	if (IS_ERR(pp->pcie_axi)) {
 		dev_err(dev, "pcie_axi clock source missing or invalid\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_out;
 	}
 
 	pp->sata_ref = clk_get(dev, "sata_ref");
 	if (IS_ERR(pp->sata_ref)) {
 		dev_err(dev, "sata_ref clock source missing or invalid\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_out;
 	}
 
 	pp->iomuxc_gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
 	if (IS_ERR(pp->iomuxc_gpr)) {
 		dev_err(dev, "unable to find iomuxc registers\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_out;
 	}
-
 
 
 	/* Enable the pwr, clks and so on */
@@ -962,7 +975,9 @@ static int __init imx_pcie_pltfm_probe(struct platform_device *pdev)
 	imx_pcie_clrset(pp, iomuxc_gpr12_app_ltssm_enable, 1 << 10, IOMUXC_GPR12);
 
 	/* add the pcie port */
-	add_pcie_port(pdev);
+	ret = add_pcie_port(pdev);
+	if (ret)
+		goto err_out;
 
 	pp->index = imx_pcie.nr_controllers;
 	imx_pcie.nr_controllers++;
@@ -1001,6 +1016,16 @@ static int __init imx_pcie_pltfm_probe(struct platform_device *pdev)
 	return 0;
 
 err_out:
+	if (pp->lvds1_sel)
+		clk_put(pp->lvds1_sel);
+	if (pp->lvds1)
+		clk_put(pp->lvds1);
+	if (pp->pcie_ref_125m)
+		clk_put(pp->pcie_ref_125m);
+	if (pp->pcie_axi)
+		clk_put(pp->pcie_axi);
+	if (pp->sata_ref)
+		clk_put(pp->sata_ref);
 	return ret;
 }
 
@@ -1022,12 +1047,17 @@ static int __exit imx_pcie_pltfm_remove(struct platform_device *pdev)
 		pr_err("no pcie clock.\n");
 
 	if (pcie_clk) {
-		clk_disable(pcie_clk);
-		clk_put(pcie_clk);
+		clk_disable(pp->pcie_axi);
+		clk_put(pp->pcie_axi);
+
+		clk_disable(pp->lvds1);
+		clk_put(pp->lvds1);
+
+		clk_put(pp->pcie_ref_125m);
+		clk_put(pp->sata_ref);
 	}
 
 	imx_pcie_clrset(pp, iomuxc_gpr1_pcie_ref_clk_en, 0 << 16, IOMUXC_GPR1);
-
 	imx_pcie_clrset(pp, iomuxc_gpr1_test_powerdown, 1 << 18, IOMUXC_GPR1);
 
 	platform_set_drvdata(pdev, NULL);
