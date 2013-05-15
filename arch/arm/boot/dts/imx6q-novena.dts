@@ -260,7 +260,7 @@
 	power-enable = <&gpio7 12 0>;
 	pcie-reset = <&gpio3 29 0>;
 	wake-up = <&gpio3 22 0>;
-//	disable-endpoint = <&gpio2 16 0>;
+	disable-endpoint = <&gpio2 16 0>;
 	status = "okay";
 };
 
