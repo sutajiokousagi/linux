@@ -92,16 +92,7 @@
 							MX6Q_PAD_CSI0_DAT4__AUD3_TXC  0x80000000
 							MX6Q_PAD_CSI0_DAT5__AUD3_TXD  0x80000000
 							MX6Q_PAD_CSI0_DAT6__AUD3_TXFS 0x80000000
-						>;
-					};
-
-					pinctrl_audmux_2: audmux-2 {
-						fsl,pins = <
-							1117 0x80000000	/* MX6Q_PAD_CSI0_DAT7__AUDMUX_AUD3_RXD */
-							1093 0x80000000	/* MX6Q_PAD_CSI0_DAT4__AUDMUX_AUD3_TXC */
-							1101 0x80000000	/* MX6Q_PAD_CSI0_DAT5__AUDMUX_AUD3_TXD */
-							1109 0x80000000	/* MX6Q_PAD_CSI0_DAT6__AUDMUX_AUD3_TXFS */
-							1146 0x80000000 /* MX6Q_PAD_CSI0_DAT11__AUDMUX_AUD3_RXFS */
+							MX6Q_PAD_CSI0_DAT11__AUD3_RXFS 0x80000000 
 						>;
 					};
 				};
@@ -122,16 +113,6 @@
 							MX6Q_PAD_DISP0_DAT2__ECSPI3_MISO 0x100b1
 							MX6Q_PAD_DISP0_DAT1__ECSPI3_MOSI 0x100b1
 							MX6Q_PAD_DISP0_DAT0__ECSPI3_SCLK 0x100b1
-						>;
-					};
-				};
-
-				ecspi3 {
-					pinctrl_ecspi3_1: ecspi3grp-1 {
-						fsl,pins = <
-							526 0x100b1	/* MX6Q_PAD_DISP0_DAT2__ECSPI3_MISO */
-							518 0x100b1	/* MX6Q_PAD_DISP0_DAT1__ECSPI3_MOSI */
-							511 0x100b1	/* MX6Q_PAD_DISP0_DAT0__ECSPI3_SCLK */
 						>;
 					};
 				};
@@ -208,7 +189,6 @@
 				i2c1 {
 					pinctrl_i2c1_1: i2c1grp-1 {
 						fsl,pins = <
-<<<<<<< HEAD
 							MX6Q_PAD_EIM_D21__I2C1_SCL 0x4001b8b1
 							MX6Q_PAD_EIM_D28__I2C1_SDA 0x4001b8b1
 						>;
@@ -229,24 +209,6 @@
 						fsl,pins = <
 							MX6Q_PAD_EIM_D17__I2C3_SCL 0x4001b8b1
 							MX6Q_PAD_EIM_D18__I2C3_SDA 0x4001b8b1
-						>;
-					};
-				};
-
-				i2c2 {
-					pinctrl_i2c2_1: i2c2grp-1 {
-						fsl,pins = <
-							91  0x4001b848	/* MX6Q_PAD_EIM_EB2__I2C2_SCL / ALT6 */
-							99  0x4001b848	/* MX6Q_PAD_EIM_D16__I2C2_SDA / ALT6 */
-						>;
-					};
-				};
-
-				i2c3 {
-					pinctrl_i2c3_1: i2c3grp-1 {
-						fsl,pins = <
-							106 0x4001b848	/* MX6Q_PAD_EIM_D17__I2C3_SCL / ALT6 */
-							114 0x4001b848	/* MX6Q_PAD_EIM_D18__I2C3_SDA / ALT6 */
 						>;
 					};
 				};
@@ -272,8 +234,8 @@
 				uart3 {
 					pinctrl_uart3_1: uart3grp-1 {
 						fsl,pins = <
-							165 0x1b0b1	/* MX6Q_PAD_EIM_D24__UART3_TXD */
-							173 0x1b0b1	/* MX6Q_PAD_EIM_D25__UART3_RXD */
+							MX6Q_PAD_EIM_D24__UART3_TX_DATA 0x1b0b1
+							MX6Q_PAD_EIM_D25__UART3_RX_DATA 0x1b0b1
 						>;
 					};
 				};
@@ -297,11 +259,6 @@
 					pinctrl_usbotg_2: usbotggrp-2 {
 						fsl,pins = <
 							MX6Q_PAD_ENET_RX_ER__USB_OTG_ID 0x17059
-						>;
-					};
-					pinctrl_usbotg_2: usbotggrp-2 {
-						fsl,pins = <
-							1591 0x17059	/* MX6Q_PAD_ENET_RX_ER__ANATOP_USBOTG_ID */
 						>;
 					};
 				};
