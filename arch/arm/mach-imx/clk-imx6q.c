@@ -239,11 +239,8 @@ enum mx6q_clks {
 	pll4_audio, pll5_video, pll8_mlb, pll7_usb_host, pll6_enet, ssi1_ipg,
 	ssi2_ipg, ssi3_ipg, rom, usbphy1, usbphy2, ldb_di0_div_3_5, ldb_di1_div_3_5,
 	sata_ref, sata_ref_100m, pcie_ref, pcie_ref_125m, enet_ref, usbphy1_gate,
-<<<<<<< HEAD
-	usbphy2_gate, pll4_post_div, pll5_post_div, pll5_video_div, clk_max
-=======
-	usbphy2_gate, lvds1_sel, lvds2_sel, lvds1, lvds2, clk_max
->>>>>>> imx: clk: Add lvds clocks
+	usbphy2_gate, pll4_post_div, pll5_post_div, pll5_video_div,
+	lvds1_sel, lvds2_sel, lvds1, lvds2, clk_max
 };
 
 static struct clk *clk[clk_max];
