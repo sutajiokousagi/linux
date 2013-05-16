@@ -243,7 +243,6 @@ static struct hw_pci imx_pcie;
 
 static int pcie_phy_cr_read(void __iomem *dbi_base, int addr, int *data);
 static int pcie_phy_cr_write(void __iomem *dbi_base, int addr, int data);
-static void change_field(int *in, int start, int end, int val);
 
 
 #if defined(CONFIG_RFKILL) || defined(CONFIG_RFKILL_MODULE)
@@ -273,6 +272,13 @@ static void imx_pcie_clrset(struct imx_pcie_port *pp,
 	tmp &= ~mask;
 	tmp |= (val & mask);
 	regmap_write(pp->iomuxc_gpr, reg, tmp);
+}
+
+static void change_field(int *in, int start, int end, int val)
+{
+	int mask;
+	mask = ((0xFFFFFFFF << start) ^ (0xFFFFFFFF << (end + 1))) & 0xFFFFFFFF;
+	*in = (*in & ~mask) | (val << start);
 }
 
 
@@ -380,7 +386,7 @@ static int imx_pcie_link_up(struct platform_device *pdev)
 		pcie_phy_cr_read(pp->dbi_base, SSP_CR_LANE0_DIG_RX_ASIC_OUT, &rx_valid);
 		ltssm = readl(pp->dbi_base + DB_R0) & 0x3F;
 		if ((ltssm == 0x0D) && ((rx_valid & 0x01) == 0)) {
-			dev_info(&pdev->dev,
+			dev_err(&pdev->dev,
 				"transition to gen2 is stuck, reset PHY!\n");
 			pcie_phy_cr_read(pp->dbi_base, SSP_CR_LANE0_DIG_RX_OVRD_IN_LO, &temp);
 			change_field(&temp, 3, 3, 0x1);
@@ -400,9 +406,10 @@ static int imx_pcie_link_up(struct platform_device *pdev)
 	if (!rc) {
 		if (iterations <= 0) {
 			dev_err(&pdev->dev,
-				"link up failed, DB_R0:0x%08x, DB_R1:0x%08x!\n",
+				"link up failed, DEBUG_R0:0x%08x, DEBUG_R1:0x%08x  RX_VALID:0x%x!\n",
 				readl(pp->dbi_base + DB_R0),
-				readl(pp->dbi_base + DB_R1));
+				readl(pp->dbi_base + DB_R1),
+				rx_valid);
 			return -ETIMEDOUT;
 		}
 		return -ENODEV;
@@ -709,13 +716,6 @@ static int pcie_phy_cr_write(void __iomem *dbi_base, int addr, int data)
 	return 1;
 }
 
-static void change_field(int *in, int start, int end, int val)
-{
-	int mask;
-	mask = ((0xFFFFFFFF << start) ^ (0xFFFFFFFF << (end + 1))) & 0xFFFFFFFF;
-	*in = (*in & ~mask) | (val << start);
-}
-
 static int imx_pcie_enable_controller(struct platform_device *pdev)
 {
 	struct imx_pcie_port *pp = platform_get_drvdata(pdev);
@@ -734,15 +734,15 @@ static int imx_pcie_enable_controller(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	ret = clk_prepare_enable(pp->lvds1);
-	if (ret) {
-		dev_err(&pdev->dev, "unable to enable lvds1: %d\n", ret);
-		return -EINVAL;
-	}
-
 	ret = clk_prepare_enable(pp->pcie_ref_125m);
 	if (ret) {
 		dev_err(&pdev->dev, "unable to enable pcie_ref_125m: %d\n", ret);
+		return -EINVAL;
+	}
+
+	ret = clk_prepare_enable(pp->lvds1);
+	if (ret) {
+		dev_err(&pdev->dev, "unable to enable lvds1: %d\n", ret);
 		return -EINVAL;
 	}
 
@@ -760,13 +760,12 @@ static void card_reset(struct platform_device *pdev)
 {
 	struct imx_pcie_port *pp = platform_get_drvdata(pdev);
 
-	/* activate PERST_B */
+	imx_pcie_clrset(pp, iomuxc_gpr1_test_powerdown, 1 << 18, IOMUXC_GPR1);
+	imx_pcie_clrset(pp, iomuxc_gpr12_app_ltssm_enable, 1 << 10, IOMUXC_GPR12);
+	imx_pcie_clrset(pp, iomuxc_gpr1_pcie_ref_clk_en, 0 << 16, IOMUXC_GPR1);
+
 	gpio_set_value(pp->pcie_rst, 0);
-
-	/* Add one reset to the pcie external device */
 	msleep(100);
-
-	/* deactive PERST_B */
 	gpio_set_value(pp->pcie_rst, 1);
 }
 
@@ -857,7 +856,7 @@ static int __init imx_pcie_pltfm_probe(struct platform_device *pdev)
                                 "wake-up", 0);
         if (gpio_is_valid(pp->pcie_wake_up))
                 devm_gpio_request_one(dev, pp->pcie_wake_up,
-                                    GPIOF_OUT_INIT_LOW,
+                                    GPIOF_IN,
                                     "PCIe wake up");
 
         pp->pcie_dis = of_get_named_gpio(pdev->dev.of_node,
@@ -957,15 +956,14 @@ static int __init imx_pcie_pltfm_probe(struct platform_device *pdev)
 		goto err_out;
 	}
 
+	/* togle the external card's reset */
+	card_reset(pdev);
 
 	/* Enable the pwr, clks and so on */
 	set_pcie_clock_tunings(pdev);
 	ret = imx_pcie_enable_controller(pdev);
 	if (ret)
 		goto err_out;
-
-	/* togle the external card's reset */
-	card_reset(pdev) ;
 
 	usleep_range(3000, 4000);
 	imx_pcie_regions_setup(pdev, pp);
@@ -1031,7 +1029,6 @@ err_out:
 
 static int __exit imx_pcie_pltfm_remove(struct platform_device *pdev)
 {
-	struct clk *pcie_clk;
 	struct device *dev = &pdev->dev;
 	struct imx_pcie_port *pp = platform_get_drvdata(pdev);
 
@@ -1041,24 +1038,33 @@ static int __exit imx_pcie_pltfm_remove(struct platform_device *pdev)
 		pp->rfkill = NULL;
 	}
 
-	/* Release clocks, and disable power  */
-	pcie_clk = of_clk_get(dev->of_node, 0);
-	if (IS_ERR(pcie_clk))
-		pr_err("no pcie clock.\n");
-
-	if (pcie_clk) {
-		clk_disable(pp->pcie_axi);
-		clk_put(pp->pcie_axi);
-
-		clk_disable(pp->lvds1);
-		clk_put(pp->lvds1);
-
-		clk_put(pp->pcie_ref_125m);
-		clk_put(pp->sata_ref);
-	}
-
 	imx_pcie_clrset(pp, iomuxc_gpr1_pcie_ref_clk_en, 0 << 16, IOMUXC_GPR1);
 	imx_pcie_clrset(pp, iomuxc_gpr1_test_powerdown, 1 << 18, IOMUXC_GPR1);
+	imx_pcie_clrset(pp, iomuxc_gpr12_app_ltssm_enable, 1 << 10, IOMUXC_GPR12);
+
+	/* Release clocks, and disable power  */
+	if (pp->pcie_axi) {
+		clk_disable(pp->pcie_axi);
+		clk_put(pp->pcie_axi);
+	}
+
+	if (pp->lvds1) {
+		clk_disable(pp->lvds1);
+		clk_put(pp->lvds1);
+	}
+
+	if (pp->pcie_ref_125m)
+		clk_put(pp->pcie_ref_125m);
+
+	if (pp->sata_ref)
+		clk_put(pp->sata_ref);
+
+	gpio_set_value(pp->pcie_rst, 0);
+	gpio_set_value(pp->pcie_pwr_en, 0);
+	gpio_set_value(pp->pcie_dis, 1);
+
+	dev_err(dev, "disabled everything\n");
+	msleep(500);
 
 	platform_set_drvdata(pdev, NULL);
 
