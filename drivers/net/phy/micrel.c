@@ -52,6 +52,13 @@
 #define MII_KSZPHY_EXTREG_WRITE			0x0c
 #define MII_KSZPHY_EXTREG_READ			0x0d
 
+/* Write/read to/from extended registers */
+#define MII_KSZPHY_EXTREG			0x0b
+#define KSZPHY_EXTREG_WRITE			0x8000
+
+#define MII_KSZPHY_EXTREG_WRITE			0x0c
+#define MII_KSZPHY_EXTREG_READ			0x0d
+
 
 /* general PHY control reg in vendor specific block. */
 #define	MII_KSZPHY_CTRL			0x1F
@@ -71,6 +78,16 @@ static int ksz_config_flags(struct phy_device *phydev)
 		return phy_write(phydev, MII_KSZPHY_CTRL, regval);
 	}
 	return 0;
+}
+
+/* Extended register */
+#define MII_KSZPHY_CLK_CONTROL_PAD_SKEW		0x104
+
+static int kszphy_extended_write(struct phy_device *phydev,
+				 u32 regnum, u16 val)
+{
+	phy_write(phydev, MII_KSZPHY_EXTREG, KSZPHY_EXTREG_WRITE | regnum);
+	return phy_write(phydev, MII_KSZPHY_EXTREG_WRITE, val);
 }
 
 static int kszphy_ack_interrupt(struct phy_device *phydev)
@@ -129,6 +146,7 @@ static int ks8737_config_intr(struct phy_device *phydev)
 
 static int kszphy_config_init(struct phy_device *phydev)
 {
+	kszphy_extended_write(phydev, MII_KSZPHY_CLK_CONTROL_PAD_SKEW, 0xf0f0);
 	return 0;
 }
 
