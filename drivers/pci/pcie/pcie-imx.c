@@ -64,21 +64,21 @@
 /* Register Definitions */
 #define PRT_LOG_R_BaseAddress 0x700
 
-/* Register DB_R0 */
+/* Register DEBUG_R0 */
 /* Debug Register 0 */
-#define DB_R0 (PRT_LOG_R_BaseAddress + 0x28)
-#define DB_R0_RegisterSize 32
-#define DB_R0_RegisterResetValue 0x0
-#define DB_R0_RegisterResetMask 0xFFFFFFFF
-/* End of Register Definition for DB_R0 */
+#define DEBUG_R0 (PRT_LOG_R_BaseAddress + 0x28)
+#define DEBUG_R0_RegisterSize 32
+#define DEBUG_R0_RegisterResetValue 0x0
+#define DEBUG_R0_RegisterResetMask 0xFFFFFFFF
+/* End of Register Definition for DEBUG_R0 */
 
-/* Register DB_R1 */
+/* Register DEBUG_R1 */
 /* Debug Register 1 */
-#define DB_R1 (PRT_LOG_R_BaseAddress + 0x2c)
-#define DB_R1_RegisterSize 32
-#define DB_R1_RegisterResetValue 0x0
-#define DB_R1_RegisterResetMask 0xFFFFFFFF
-/* End of Register Definition for DB_R1 */
+#define DEBUG_R1 (PRT_LOG_R_BaseAddress + 0x2c)
+#define DEBUG_R1_RegisterSize 32
+#define DEBUG_R1_RegisterResetValue 0x0
+#define DEBUG_R1_RegisterResetMask 0xFFFFFFFF
+/* End of Register Definition for DEBUG_R1 */
 
 #define ATU_R_BaseAddress 0x900
 #define PCIE_PL_iATUVR (ATU_R_BaseAddress + 0x0)
@@ -374,7 +374,7 @@ static int imx_pcie_link_up(struct platform_device *pdev)
 	rc = 0;
 	for (iterations = 200; iterations > 0 && !rc; iterations--) {
 		/* link is debug bit 36, debug register 1 starts at bit 32 */
-		rc = readl(pp->dbi_base + DB_R1) & (0x1 << (36 - 32)) ;
+		rc = readl(pp->dbi_base + DEBUG_R1) & (0x1 << (36 - 32)) ;
 		usleep_range(2000, 3000);
 
 		/* From L0, initiate MAC entry to gen2 if EP/RC supports gen2.
@@ -384,7 +384,7 @@ static int imx_pcie_link_up(struct platform_device *pdev)
 		 * to gen2 is stuck
 		 */
 		pcie_phy_cr_read(pp->dbi_base, SSP_CR_LANE0_DIG_RX_ASIC_OUT, &rx_valid);
-		ltssm = readl(pp->dbi_base + DB_R0) & 0x3F;
+		ltssm = readl(pp->dbi_base + DEBUG_R0) & 0x3F;
 		if ((ltssm == 0x0D) && ((rx_valid & 0x01) == 0)) {
 			dev_err(&pdev->dev,
 				"transition to gen2 is stuck, reset PHY!\n");
@@ -407,8 +407,8 @@ static int imx_pcie_link_up(struct platform_device *pdev)
 		if (iterations <= 0) {
 			dev_err(&pdev->dev,
 				"link up failed, DEBUG_R0:0x%08x, DEBUG_R1:0x%08x  RX_VALID:0x%x!\n",
-				readl(pp->dbi_base + DB_R0),
-				readl(pp->dbi_base + DB_R1),
+				readl(pp->dbi_base + DEBUG_R0),
+				readl(pp->dbi_base + DEBUG_R1),
 				rx_valid);
 			return -ETIMEDOUT;
 		}
