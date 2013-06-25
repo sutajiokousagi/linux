@@ -82,6 +82,8 @@ static int ksz_config_flags(struct phy_device *phydev)
 
 /* Extended register */
 #define MII_KSZPHY_CLK_CONTROL_PAD_SKEW		0x104
+#define MII_KSZPHY_RX_DATA_PAD_SKEW		0x105
+#define MII_KSZPHY_TX_DATA_PAD_SKEW		0x106
 
 static int kszphy_extended_write(struct phy_device *phydev,
 				 u32 regnum, u16 val)
@@ -147,6 +149,8 @@ static int ks8737_config_intr(struct phy_device *phydev)
 static int kszphy_config_init(struct phy_device *phydev)
 {
 	kszphy_extended_write(phydev, MII_KSZPHY_CLK_CONTROL_PAD_SKEW, 0xf0f0);
+	kszphy_extended_write(phydev, MII_KSZPHY_RX_DATA_PAD_SKEW, 0x0000);
+	kszphy_extended_write(phydev, MII_KSZPHY_TX_DATA_PAD_SKEW, 0xffff);
 	return 0;
 }
 
