@@ -208,10 +208,11 @@ clocks and IDs.
 	pll4_post_div		193
 	pll5_post_div		194
 	pll5_video_div		195
-	lvds1_sel		196
-	lvds2_sel		197
-	lvds1			198
-	lvds2			199
+	eim_slow      		196
+	lvds1_sel		197
+	lvds2_sel		198
+	lvds1			199
+	lvds2			200
 
 Examples:
 

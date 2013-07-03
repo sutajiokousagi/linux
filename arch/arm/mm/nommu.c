@@ -20,12 +20,19 @@
 
 void __init arm_mm_memblock_reserve(void)
 {
+#ifndef CONFIG_CPU_V7M
 	/*
 	 * Register the exception vector page.
 	 * some architectures which the DRAM is the exception vector to trap,
 	 * alloc_page breaks with error, although it is not NULL, but "0."
 	 */
 	memblock_reserve(CONFIG_VECTORS_BASE, PAGE_SIZE);
+#else /* ifndef CONFIG_CPU_V7M */
+	/*
+	 * There is no dedicated vector page on V7-M. So nothing needs to be
+	 * reserved here.
+	 */
+#endif
 }
 
 void __init sanity_check_meminfo(void)
@@ -56,6 +63,12 @@ void flush_dcache_page(struct page *page)
 	__cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
 }
 EXPORT_SYMBOL(flush_dcache_page);
+
+void flush_kernel_dcache_page(struct page *page)
+{
+	__cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
+}
+EXPORT_SYMBOL(flush_kernel_dcache_page);
 
 void copy_to_user_page(struct vm_area_struct *vma, struct page *page,
 		       unsigned long uaddr, void *dst, const void *src,
