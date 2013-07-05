@@ -97,6 +97,7 @@ static const struct of_device_id ahci_of_match[] = {
 	{ .compatible = "calxeda,hb-ahci",  .data = &ahci_devtype[AHCI],}, 
 	{ .compatible = "fsl,imx6q-ahci",   .data = &ahci_devtype[IMX6Q_AHCI],}, 
 	{ .compatible = "snps,spear-ahci", }, 
+	{ .compatible = "snps,exynos5440-ahci", },
 	{}, 
 }; 
 MODULE_DEVICE_TABLE(of, ahci_of_match); 

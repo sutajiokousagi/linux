@@ -249,8 +249,8 @@ static int imx_novena_probe(struct platform_device *pdev)
 	data->dai.stream_name = "HiFi";
 	data->dai.codec_dai_name = "es8328";
 	data->dai.codec_of_node = codec_np;
-	data->dai.cpu_dai_name = dev_name(&ssi_pdev->dev);
-	data->dai.platform_name = "imx-pcm-audio";
+	data->dai.cpu_of_node = ssi_np;
+	data->dai.platform_of_node = ssi_np;
 	data->dai.init = &imx_novena_dai_init;
 	data->dai.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
 			    SND_SOC_DAIFMT_CBM_CFM;
