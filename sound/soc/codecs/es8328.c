@@ -614,7 +614,6 @@ static int __init es8328_modinit(void)
 {
 	int ret = 0;
 #if defined(CONFIG_I2C) || defined(CONFIG_I2C_MODULE)
-	printk(KERN_ERR "Adding i2c driver\n");
 	ret = i2c_add_driver(&es8328_i2c_driver);
 	if (ret != 0) {
 		printk(KERN_ERR "Failed to register es8328 I2C driver: %d\n",
@@ -622,7 +621,6 @@ static int __init es8328_modinit(void)
 	}
 #endif
 #if defined(CONFIG_SPI_MASTER)
-	printk(KERN_ERR "Adding spi driver\n");
 	ret = spi_register_driver(&es8328_spi_driver);
 	if (ret != 0) {
 		printk(KERN_ERR "Failed to register es8328 SPI driver: %d\n",

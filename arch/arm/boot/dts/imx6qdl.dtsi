@@ -663,7 +663,7 @@
 				      <0x01100000 0xe00000>,
 				      <0x01f00000 0xfc000>;
 				interrupts = <0 122 0x04>;
-				clocks = <&clks 186>, <&clks 189>, <&clks 196>, <&clks 198>, <&clks 144>;
+				clocks = <&clks 186>, <&clks 189>, <&clks 197>, <&clks 199>, <&clks 144>;
 				clock-names = "sata_ref", "pcie_ref_125m", "lvds1_sel", "lvds1", "pcie_axi";
 				status = "disabled";
 			};

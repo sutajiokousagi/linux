@@ -79,7 +79,34 @@
 		mux-int-port = <1>;
 		mux-ext-port = <3>;
 	};
+
+	soc {
+		galcore: vivante@0x00130000 {
+			compatible = "fsl,imx6q-gpu";
+			interrupts = <0 9 0x4    0 10 0x4    0 11 0x4>;
+			interrupt-names = "irq_3d", "irq_2d", "irq_vg";
+			clocks = <&clks 122>, <&clks 27>, <&clks 74>,
+				 <&clks 121>, <&clks 26>,
+				 <&clks 143>;
+			clock-names = "gpu3d_clk", "gpu3d_axi_clk", "gpu3d_shader_clk",
+				      "gpu2d_clk", "gpu2d_axi_clk",
+				      "openvg_axi_clk";
+			reg = <0 0x4000  0x00130000 0x4000  0x00134000 0x4000  0x02204000 0x4000>;
+			reg-names = "phys_baseaddr", "iobase_3d", "iobase_2d", "iobase_vg";
+			contiguoussize = <0x0c000000>;
+			contiguousbase = <0x40000000>;
+		};
+	};
+
+        backlight {
+                compatible = "pwm-backlight";
+                pwms = <&pwm1 0 10000>;
+
+                brightness-levels = <0 3 6 12 16 24 32 48 64 96 128 192 255>;
+                default-brightness-level = <12>;
+        };
 };
+
 
 &ssi1 {
 	fsl,mode = "i2s-slave";
@@ -135,6 +162,9 @@
 				/* GPIO LED */
 				MX6Q_PAD_EIM_D19__GPIO3_IO19  0x80000000
 
+				/* Backlight PWM */
+				MX6Q_PAD_DISP0_DAT8__PWM1_OUT 0x80000000
+
 				/* PCI express */
 				MX6Q_PAD_EIM_D22__GPIO3_IO22  0x80000000 /* Wakeup */
 				MX6Q_PAD_EIM_D29__GPIO3_IO29  0x80000000 /* Reset */
@@ -146,15 +176,42 @@
 			>;
 		};
 	};
+
+	enet {
+		pinctrl_enet_novena: enetgrp-novena {
+			fsl,pins = <
+				MX6Q_PAD_ENET_MDIO__ENET_MDIO       0x1b0b0
+				MX6Q_PAD_ENET_MDC__ENET_MDC         0x1b0b0
+				MX6Q_PAD_RGMII_TXC__RGMII_TXC_DDR3  0x1b020
+				MX6Q_PAD_RGMII_TD0__RGMII_TD0       0x1b028
+				MX6Q_PAD_RGMII_TD1__RGMII_TD1       0x1b028
+				MX6Q_PAD_RGMII_TD2__RGMII_TD2       0x1b028
+				MX6Q_PAD_RGMII_TD3__RGMII_TD3       0x1b028
+				MX6Q_PAD_RGMII_TX_CTL__RGMII_TX_CTL 0x1b028
+				MX6Q_PAD_ENET_REF_CLK__ENET_TX_CLK  0x1b0b0
+				MX6Q_PAD_RGMII_RXC__RGMII_RXC       0x1b0b0
+				MX6Q_PAD_RGMII_RD0__RGMII_RD0       0x1b0b0
+				MX6Q_PAD_RGMII_RD1__RGMII_RD1       0x1b0b0
+				MX6Q_PAD_RGMII_RD2__RGMII_RD2       0x1b0b0
+				MX6Q_PAD_RGMII_RD3__RGMII_RD3       0x1b0b0
+				MX6Q_PAD_RGMII_RX_CTL__RGMII_RX_CTL 0x1b0b0
+				MX6Q_PAD_GPIO_16__ENET_REF_CLK      0x4001b0a8
+			>;
+		};
+	};
 };
+
 
 &fec {
 	pinctrl-names = "default";
-        pinctrl-0 = <&pinctrl_enet_1>;
+        pinctrl-0 = <&pinctrl_enet_novena>;
 	phy-mode = "rgmii";
         phy-reset-gpios = <&gpio3 23 0>;
 	mac-address = [00 0E C6 87 72 01];
 	status = "okay";
+	micrel,clk-skew = <0xf0f0>;
+	micrel,rx-skew = <0x0000>;
+	micrel,tx-skew = <0xffff>;
 };
 
 &usdhc2 {
@@ -175,12 +232,17 @@
 &usbotg {
 	vbus-supply = <&reg_usb_otg_vbus>;
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_usbotg_2>;
+//	pinctrl-0 = <&pinctrl_usbotg_2>;
 	disable-over-current;
+	otg_id_pin_select_change;
+	dr_mode = "otg";
+	xobs,devname = "otg";
 	status = "okay";
 };
 
 &usbh1 {
+	xobs,devname = "usbh1";
+	dr_mode = "host";
 	status = "okay";
 };
 
@@ -195,6 +257,7 @@
 	pinctrl-0 = <&pinctrl_i2c1_1>;
 	status = "okay";
 
+/*
 	stmpe610@0 {
 		compatible = "st,stmpe610";
 		#address-cells = <1>;
@@ -221,14 +284,8 @@
 			ts,fraction-z = <7>;
 			ts,i-drive = <1>;
 		};
-/*
-		stmpe_gpio {
-			compatible = "st,stmpe-gpio";
-			gpio-controller;
-			#gpio-cells = <2>;
-		};
-*/
 	};
+*/
 };
 
 &i2c2 {
@@ -245,6 +302,12 @@
 	codec: es8328@11 {
 		compatible = "everest,es8328";
 		reg = <0x11>;
+	};
+
+	stdp4028@73 {
+		compatible = "st,stdp4028";
+//		power-switch = <&gpio5 28 0>;
+		reg = <0x73>;
 	};
 };
 
@@ -265,7 +328,7 @@
 	power-enable = <&gpio7 12 0>;
 	pcie-reset = <&gpio3 29 0>;
 	wake-up = <&gpio3 22 0>;
-	disable-endpoint = <&gpio2 16 0>;
+//	disable-endpoint = <&gpio2 16 0>;
 	status = "okay";
 };
 
@@ -278,7 +341,7 @@
 		status = "okay";
                 display-timings {
 			2560x1700p50 {
-				clock-frequency = <200000000>;
+				clock-frequency = <240000000>;
 				hactive = <2560>;
 				vactive = <1700>;
 				hback-porch = <80>;
@@ -290,21 +353,6 @@
 				hsync-active = <1>;
 				vsync-active = <1>;
 			};
-			/*
-			1280x720p50 {
-				clock-frequency = <74176000>;
-				hactive = <1280>;
-				vactive = <720>;
-				hback-porch = <110>;
-				hfront-porch = <220>;
-				hsync-len = <40>;
-				vback-porch = <20>;
-				vfront-porch = <5>;
-				vsync-len = <5>;
-				hsync-active = <1>;
-				vsync-active = <1>;
-			};
-			*/
                 };
         };
 };
@@ -331,4 +379,5 @@
 	};
 };
 */
+
 

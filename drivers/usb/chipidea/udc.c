@@ -462,7 +462,7 @@ static int _hardware_enqueue(struct ci_hw_ep *hwep, struct ci_hw_req *hwreq)
 		pages--;
 
 	if (rest == 0)
-		
+		add_td_to_list(hwep, hwreq, 0);
 
 	while (rest > 0) {
 		unsigned count = min(hwreq->req.length - hwreq->req.actual,
@@ -480,6 +480,10 @@ static int _hardware_enqueue(struct ci_hw_ep *hwep, struct ci_hw_req *hwreq)
 	lastnode = list_entry(hwreq->tds.prev,
 		struct td_node, td);
 
+	if (!lastnode)
+		panic("lastnode is NULL!\n");
+	if (!lastnode->ptr)
+		panic("lastnode->ptr is NULL!\n");
 	lastnode->ptr->next = cpu_to_le32(TD_TERMINATE);
 	if (!hwreq->req.no_interrupt)
 		lastnode->ptr->token |= cpu_to_le32(TD_IOC);

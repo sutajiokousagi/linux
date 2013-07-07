@@ -319,6 +319,7 @@ static int f_audio_out_ep_complete(struct usb_ep *ep, struct usb_request *req)
 	audio->copy_buf = copy_buf;
 
 	err = usb_ep_queue(ep, req, GFP_ATOMIC);
+//	dev_err(&cdev->gadget->dev, "Completing audio with EP %s\n", ep->name);
 	if (err)
 		ERROR(cdev, "%s queue req: %d\n", ep->name, err);
 
@@ -549,6 +550,7 @@ static int f_audio_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 	int i = 0, err = 0;
 
 	DBG(cdev, "intf %d, alt %d\n", intf, alt);
+	out_ep->desc = &as_out_ep_desc;
 
 	if (intf == 1) {
 		if (alt == 1) {
@@ -574,6 +576,7 @@ static int f_audio_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 							f_audio_complete;
 						err = usb_ep_queue(out_ep,
 							req, GFP_ATOMIC);
+//						dev_err(&cdev->gadget->dev, "Setting alt with EP %s\n", out_ep->name);
 						if (err)
 							ERROR(cdev,
 							"%s queue req: %d\n",
@@ -653,6 +656,7 @@ f_audio_bind(struct usb_configuration *c, struct usb_function *f)
 	ep = usb_ep_autoconfig(cdev->gadget, &as_out_ep_desc);
 	if (!ep)
 		goto fail;
+	dev_err(&cdev->gadget->dev, "Grabbed audio EP %s\n", ep->name);
 	audio->out_ep = ep;
 	audio->out_ep->desc = &as_out_ep_desc;
 	ep->driver_data = cdev;	/* claim */
