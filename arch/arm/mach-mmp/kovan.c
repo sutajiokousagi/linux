@@ -25,6 +25,7 @@
 #include <linux/leds_pwm.h>
 #include <linux/pwm_backlight.h>
 #include <linux/gpio_keys.h>
+#include <linux/gpio.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -52,7 +53,9 @@
 #define USB_WIFI_GPIO 101
 #define KOVAN_GPIO_POWERKEY 89
 
-static unsigned long kovan_pin_config[] __initdata = {
+static int usb_wifi_gpio;
+
+static unsigned long netv_pin_config[] __initdata = {
 
 	/* MMC controller */
 	GPIO0_MMC3_DAT7,
@@ -108,11 +111,6 @@ static unsigned long kovan_pin_config[] __initdata = {
 	MFP_CFG(GPIO109, AF0),
 
 
-	/* UART3 */
-	MFP_CFG(GPIO98, AF2), // txd (cpu to world)
-	MFP_CFG(GPIO99, AF2), // rxd (world to cpu)
-
-
 	/* Audio controller - I2S / SPI / SSP0 */
 	GPIO113_I2S_MCLK, // I2S audio output to the FPGA
 	MFP_CFG(GPIO114, AF1), /* SSP1 FRM */
@@ -152,15 +150,14 @@ static unsigned long kovan_pin_config[] __initdata = {
 	MFP_CFG(GPIO20, AF0), /* JTAG TCK */
 	MFP_CFG(GPIO34, AF0), /* JTAG TDO */
 
-
 	/* Recovery button */
 	MFP_CFG(GPIO89, AF0),
 
 	/* vsync input */
 	MFP_CFG(GPIO49, AF0),
 
-	/* Touchscreen IRQ */
-	MFP_CFG(GPIO52, AF0),
+	/* USB WIFI power control */
+	MFP_CFG(GPIO101, AF0),
 };
 
 
@@ -178,22 +175,12 @@ static struct stmpe_ts_platform_data stmpe610_ts_data = {
 	.i_drive = 0,		/* 20 mA drive */
 };
 
-static struct stmpe_platform_data stmpe610_data = {
-	.id		= 1,
-	.blocks		= STMPE_BLOCK_TOUCHSCREEN,
-	.irq_trigger	= IRQF_TRIGGER_FALLING,
-	.irq_gpio	= 52,
-	.irq_over_gpio	= true,
-	.ts		= &stmpe610_ts_data,
-};
-
-
 /*
  * PWM green LED
  */
-static struct led_pwm kovan_pwm_leds[] = {
+static struct led_pwm netv_pwm_leds[] = {
 	{
-		.name			= "kovan:green:state",
+		.name			= "netv:green:state",
 		.default_trigger	= "heartbeat",
 		.pwm_id			= 2,
 		.max_brightness		= 100,
@@ -201,16 +188,16 @@ static struct led_pwm kovan_pwm_leds[] = {
 	},
 };
 
-static struct led_pwm_platform_data kovan_pwm_leds_platform_data = {
-	.leds		= kovan_pwm_leds,
-	.num_leds	= ARRAY_SIZE(kovan_pwm_leds),
+static struct led_pwm_platform_data netv_pwm_leds_platform_data = {
+	.leds		= netv_pwm_leds,
+	.num_leds	= ARRAY_SIZE(netv_pwm_leds),
 };
 
-static struct platform_device kovan_leds_device = {
+static struct platform_device netv_leds_device = {
 	.name	= "leds_pwm",
 	.id	= -1,
 	.dev	= {
-		.platform_data	= &kovan_pwm_leds_platform_data,
+		.platform_data	= &netv_pwm_leds_platform_data,
 	},
 };
 
@@ -219,7 +206,7 @@ static struct platform_device kovan_leds_device = {
 /*
  * GPIO keys
  */
-static struct gpio_keys_button kovan_gpio_keys_buttons[] = {
+static struct gpio_keys_button netv_gpio_keys_buttons[] = {
 	{
 		.code		= KEY_POWER,
 		.gpio		= KOVAN_GPIO_POWERKEY,
@@ -230,36 +217,16 @@ static struct gpio_keys_button kovan_gpio_keys_buttons[] = {
 	},
 };
 
-static struct gpio_keys_platform_data kovan_gpio_keys_data = {
-	.buttons	= kovan_gpio_keys_buttons,
-	.nbuttons	= ARRAY_SIZE(kovan_gpio_keys_buttons),
+static struct gpio_keys_platform_data netv_gpio_keys_data = {
+	.buttons	= netv_gpio_keys_buttons,
+	.nbuttons	= ARRAY_SIZE(netv_gpio_keys_buttons),
 };
 
-static struct platform_device kovan_keys_device = {
+static struct platform_device netv_keys_device = {
 	.name	= "gpio-keys",
 	.id	= -1,
 	.dev	= {
-		.platform_data = &kovan_gpio_keys_data,
-	},
-};
-
-
-
-/*
- * Backlight data
- */
-static struct platform_pwm_backlight_data kovan_backlight_data = {
-	.pwm_id		= 0,
-	.max_brightness	= 100,
-	.dft_brightness	= 100,
-	.pwm_period_ns	= 10000,
-};
-
-static struct platform_device kovan_backlight_device = {
-	.name		= "pwm-backlight",
-	.dev		= {
-		.parent		= &pxa168_device_pwm0.dev,
-		.platform_data	= &kovan_backlight_data,
+		.platform_data = &netv_gpio_keys_data,
 	},
 };
 
@@ -270,29 +237,27 @@ static struct platform_device kovan_backlight_device = {
 static struct fb_videomode video_modes_aspen[] = {
 	/* lpj032l001b HVGA mode info */
         [0] = {
-                .pixclock       = 156000,
-                .refresh        = 60,
-
-                .hsync_len      = 30,
-                .left_margin    = 38,
-                .xres           = 320,
-                .right_margin   = 20,
-
-                .vsync_len      = 3,
-                .upper_margin   = 15,
-                .yres           = 240,
-                .lower_margin   = 4,
-
-                .sync           = 0, 
-        },
+        	.pixclock	= 74175,
+		.refresh	= 60,
+		.xres		= 1280,
+		.yres		= 720,
+		.hsync_len	= 40 /*128*/,
+		.left_margin	= 110 /*215*/,
+		.right_margin	= 220,
+		.vsync_len	= 5 /*4*/,
+		.upper_margin	= 5, // 23
+		.lower_margin	= 20, // 1
+		.sync		= FB_SYNC_VERT_HIGH_ACT,
+	},
 };
 
-struct pxa168fb_mach_info kovan_lcd_info __initdata = {
-	.id                     = "Base-kovan",
+#define LCD_SCLK (312000000UL)
+struct pxa168fb_mach_info netv_lcd_info __initdata = {
+	.id                     = "Base-netv",
 	.modes                  = video_modes_aspen,
 	.num_modes              = ARRAY_SIZE(video_modes_aspen),
 	.pix_fmt                = PIX_FMT_RGB565,
-	.max_fb_size		= 320 * 240 * 4 * 2,
+	.max_fb_size		= 1920 * 1080 * 2 * 2,
 
 	.active                 = 1,
 	.enable_lcd             = 1,
@@ -304,13 +269,18 @@ struct pxa168fb_mach_info kovan_lcd_info __initdata = {
 	.gpio_output_data	= 0x10,
 
 	.invert_pix_val_ena	= 1,
+	.invert_vsync		= 1,
+	.invert_hsync		= 1,
+	.sclk_clock		= LCD_SCLK,
 };
 
-struct pxa168fb_mach_info kovan_lcd_ovly_info __initdata = {
-        .id                     = "Ovly-kovan",
-        .modes                  = video_modes_aspen,
-        .num_modes              = ARRAY_SIZE(video_modes_aspen),
-        .pix_fmt                = PIX_FMT_RGB565,
+struct pxa168fb_mach_info netv_lcd_ovly_info __initdata = {
+        .id                     = "Ovly-netv",
+	.modes                  = video_modes_aspen,
+	.num_modes              = ARRAY_SIZE(video_modes_aspen),
+	.pix_fmt                = PIX_FMT_RGB565,
+	.max_fb_size		= 1920 * 1080 * 2 * 2,
+
 	.active                 = 1,
 	.enable_lcd             = 1,
 
@@ -321,6 +291,9 @@ struct pxa168fb_mach_info kovan_lcd_ovly_info __initdata = {
 	.gpio_output_data	= 0x10,
 
 	.invert_pix_val_ena	= 1,
+	.invert_vsync		= 1,
+	.invert_hsync		= 1,
+	.sclk_clock		= LCD_SCLK,
 };
 
 
@@ -329,17 +302,11 @@ struct pxa168fb_mach_info kovan_lcd_ovly_info __initdata = {
 /*
  * I2C devices
  */
-static struct i2c_board_info kovan_i2c_board_info[] = {
+static struct i2c_board_info netv_i2c_board_info[] = {
 
 };
 
 static struct i2c_board_info pwr_i2c_board_info[] = {
-	/* Touchscreen */
-	{
-		I2C_BOARD_INFO("stmpe610", 0x44),
-		.platform_data = &stmpe610_data,
-	},
-
 	/* Audio codec */
 	{
 		I2C_BOARD_INFO("es8328", 0x11),
@@ -374,7 +341,7 @@ static struct pfn_cfg mmc3_pfn_cfg[] = {
 };
 
 
-static struct pxasdh_platform_data kovan_sdh_platform_data_mmc3 = {
+static struct pxasdh_platform_data netv_sdh_platform_data_mmc3 = {
 	.detect_delay	= 20,
 	.ocr_mask	= MMC_VDD_29_30 | MMC_VDD_30_31,
 	.bus_width	= 8,
@@ -388,7 +355,7 @@ static struct pxasdh_platform_data kovan_sdh_platform_data_mmc3 = {
 /*
  * USB OTG interface
  */
-static int kovan_u2o_vbus_status(unsigned base)
+static int netv_u2o_vbus_status(unsigned base)
 {
 	int status = VBUS_LOW;
 
@@ -402,52 +369,52 @@ static int kovan_u2o_vbus_status(unsigned base)
 
 }
 
-static int kovan_u2o_vbus_set(int vbus_type)
+static int netv_u2o_vbus_set(int vbus_type)
 {
 	return 0;
 }
-static int kovan_otg_init(void)
-{
-	return 0;
-}
-
-static int kovan_u2o_vbus_set_ic(int function)
+static int netv_otg_init(void)
 {
 	return 0;
 }
 
-static struct otg_pmic_ops kovan_otg_ops = {
-	.otg_vbus_init          = kovan_otg_init,
-	.otg_set_vbus           = kovan_u2o_vbus_set,
-	.otg_set_vbus_ic        = kovan_u2o_vbus_set_ic,
-	.otg_get_vbus_state     = kovan_u2o_vbus_status,
+static int netv_u2o_vbus_set_ic(int function)
+{
+	return 0;
+}
+
+static struct otg_pmic_ops netv_otg_ops = {
+	.otg_vbus_init          = netv_otg_init,
+	.otg_set_vbus           = netv_u2o_vbus_set,
+	.otg_set_vbus_ic        = netv_u2o_vbus_set_ic,
+	.otg_get_vbus_state     = netv_u2o_vbus_status,
 };
 
-struct otg_pmic_ops *init_kovan_otg_ops(void)
+struct otg_pmic_ops *init_netv_otg_ops(void)
 {
-	return &kovan_otg_ops;
+	return &netv_otg_ops;
 }
 
-static int kovan_usbid_detect(struct otg_transceiver *otg)
+static int netv_usbid_detect(struct otg_transceiver *otg)
 {
 	return 1; /* OTG_B_DEVICE */
 }
 
-static struct pxa_usb_plat_info kovan_u2o_info = {
+static struct pxa_usb_plat_info netv_u2o_info = {
 	.phy_init	= pxa168_usb_phy_init,
 	.phy_deinit	= pxa168_usb_phy_deinit,
-	.vbus_set	= kovan_u2o_vbus_set,
-	.vbus_status	= kovan_u2o_vbus_status,
-	.init_pmic_ops	= (void *)init_kovan_otg_ops,
-	.usbid_detect	= kovan_usbid_detect,
+	.vbus_set	= netv_u2o_vbus_set,
+	.vbus_status	= netv_u2o_vbus_status,
+	.init_pmic_ops	= (void *)init_netv_otg_ops,
+	.usbid_detect	= netv_usbid_detect,
 	.is_otg		= 1,
 };
 
 
 /* USB 2.0 Host Controller */
-static struct pxa_usb_plat_info kovan_u2h_info = {
+static struct pxa_usb_plat_info netv_u2h_info = {
 	.phy_init	= pxa168_usb_phy_init,
-	.vbus_set	= kovan_u2o_vbus_set,
+	.vbus_set	= netv_u2o_vbus_set,
 };
 
 
@@ -455,7 +422,7 @@ static struct pxa_usb_plat_info kovan_u2h_info = {
 /*
  * FPGA interface
  */
-static struct platform_device kovan_fpga_device = {
+static struct platform_device netv_fpga_device = {
 	.name		= "silvermoon-fpga",
 };
 
@@ -490,7 +457,7 @@ struct platform_device pxa_spi_ssp4 = {
 	},
 };
 
-static struct spi_board_info kovan_spi_board_info[] __initdata = {
+static struct spi_board_info netv_spi_board_info[] __initdata = {
 	{
 		.modalias	= "spidev",
 		.max_speed_hz	= 26000000,
@@ -508,16 +475,16 @@ static struct spi_board_info kovan_spi_board_info[] __initdata = {
 
 
 
-static void kovan_power_off(void)
+static void netv_power_off(void)
 {
 	while(1);
 }
 
 
 
-static void __init kovan_init(void)
+static void __init netv_init(void)
 {
-	mfp_config(ARRAY_AND_SIZE(kovan_pin_config));
+	mfp_config(ARRAY_AND_SIZE(netv_pin_config));
         pxa168_set_vdd_iox(VDD_IO0, VDD_IO_3P3V);
 	pxa168_set_vdd_iox(VDD_IO1, VDD_IO_3P3V);
 	pxa168_set_vdd_iox(VDD_IO2, VDD_IO_3P3V);
@@ -527,63 +494,52 @@ static void __init kovan_init(void)
 
 	/* on-chip devices */
 	pxa168_add_uart(1);
-	pxa168_add_uart(3);
 
 	pxa168_add_freq();
 
-	if(pxa168_add_ssp(0))
-		printk("Unable to add SSP0\n");
-	if(pxa168_add_ssp(1))
-		printk("Unable to add SSP1\n");
-	if(pxa168_add_ssp(2))
-		printk("Unable to add SSP2\n");
-	if(pxa168_add_ssp(3))
-		printk("Unable to add SSP3\n");
-	if(pxa168_add_ssp(4))
-		printk("Unable to add SSP4\n");
-
-	spi_register_board_info(kovan_spi_board_info,
-		ARRAY_SIZE(kovan_spi_board_info));
+	spi_register_board_info(netv_spi_board_info,
+		ARRAY_SIZE(netv_spi_board_info));
         platform_device_register(&pxa_spi_ssp3);
         platform_device_register(&pxa_spi_ssp4);
 
-	pxa168_add_twsi(0, &i2c_info, ARRAY_AND_SIZE(kovan_i2c_board_info));
+	pxa168_add_twsi(0, &i2c_info, ARRAY_AND_SIZE(netv_i2c_board_info));
 	pxa168_add_twsi(1, &i2c_info, ARRAY_AND_SIZE(pwr_i2c_board_info));
 
- 	pxa168_add_u2o(&kovan_u2o_info);
+ 	pxa168_add_u2o(&netv_u2o_info);
 
 #ifdef CONFIG_USB_OTG
-	pxa168_add_u2ootg(&kovan_u2o_info);
-	pxa168_add_u2oehci(&kovan_u2o_info);
+	pxa168_add_u2ootg(&netv_u2o_info);
+	pxa168_add_u2oehci(&netv_u2o_info);
 #endif
 
- 	pxa168_add_u2h(&kovan_u2h_info);
+ 	pxa168_add_u2h(&netv_u2h_info);
 
-	pxa168_add_sdh(2, &kovan_sdh_platform_data_mmc3);
+	pxa168_add_sdh(2, &netv_sdh_platform_data_mmc3);
 
 	pxa168_cir_init();
 
-
-	pxa168_add_fb(&kovan_lcd_info);
-	pxa168_add_fb_ovly(&kovan_lcd_ovly_info);
+	pxa168_add_fb(&netv_lcd_info);
+	pxa168_add_fb_ovly(&netv_lcd_ovly_info);
 
 	/* Add FPGA device interface */
-	platform_device_register(&kovan_fpga_device);
+	platform_device_register(&netv_fpga_device);
 
 	pxa168_add_rtc(&pxa910_device_rtc);
 
-	platform_device_register(&kovan_keys_device);
+	platform_device_register(&netv_keys_device);
 
 	/* Add the power state LED */
 	platform_device_register(&pxa168_device_pwm2);
-	platform_device_register(&kovan_leds_device);
+	platform_device_register(&netv_leds_device);
 
 	/* Add the LCD backlight */
 	platform_device_register(&pxa168_device_pwm0);
-	platform_device_register(&kovan_backlight_device);
 
+	/* Hack to get wifi working */
+	usb_wifi_gpio = gpio_request(USB_WIFI_GPIO, "wifi power switch");
+	gpio_direction_output(USB_WIFI_GPIO, 1);
 
-	pm_power_off = kovan_power_off;
+	pm_power_off = netv_power_off;
 }
 
 
@@ -595,5 +551,5 @@ MACHINE_START(KOVAN, "PXA168-based Kovan Platform")
 	.map_io		= pxa_map_io,
 	.init_irq       = pxa168_init_irq,
 	.timer          = &pxa168_timer,
-	.init_machine   = kovan_init,
+	.init_machine   = netv_init,
 MACHINE_END

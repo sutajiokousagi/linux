@@ -232,14 +232,6 @@ ssize_t fpga_write(struct file *filp, const char __user *buf, size_t count,
 	}
 	PDEBUG( "wrote %d bytes\n", count );
 	
-	if( count % 2 ) {
-	  gpio_direction_output(45, 1);
-	  gpio_set_value(45, 1);
-	} else {
-	  gpio_direction_output(45, 1);
-	  gpio_set_value(45, 0);
-	}
-
 	retval = count; // this means we got it all
 
   out:
@@ -293,24 +285,6 @@ int fpga_ioctl(struct inode *inode, struct file *filp,
 	  gpio_set_value(119,1);
 	  break;
 	  
-	case FPGA_IOCLED0:
-	  PDEBUG( "kovan_xilinx ioctl: led0 %d\n", arg );
-	  if(arg) {
-	    gpio_set_value(45, 0);
-	  } else {
-	    gpio_set_value(45, 1);
-	  }
-	  break;
-        
-	case FPGA_IOCLED1:
-	  PDEBUG( "kovan_xilinx ioctl: led1 %d\n", arg );
-	  if(arg) {
-	    gpio_set_value(46, 0);
-	  } else {
-	    gpio_set_value(46, 1);
-	  }
-	  break;
-
 	case FPGA_IOCDONE:
 	  tmp = __gpio_get_value(97) ? 1 : 0;
 	  __put_user(tmp, (int __user *)arg);
@@ -353,15 +327,6 @@ void fpga_cleanup_module(void)
 	int i;
 	dev_t devno = MKDEV(fpga_major, fpga_minor);
 
-
-	// turn off the LEDs
-  gpio_direction_output(45, 1);
-  gpio_set_value(45, 1);
-  gpio_free(45);
-
-  gpio_direction_output(46, 1);
-  gpio_set_value(46, 1);
-  gpio_free(46);
 
   free_irq(IRQ_GPIO(49), NULL);
   gpio_direction_input(120);
@@ -455,14 +420,6 @@ void fpga_init_hw(void) {
   };
   mfp_config(ARRAY_AND_SIZE(pin_config));
   
-  gpio_request(45, "LED 0");
-  gpio_direction_output(45, 1);
-  gpio_set_value(45, 0);
-
-  gpio_request(46, "LED 1");
-  gpio_direction_output(46, 1);
-  gpio_set_value(46, 0);
-
   gpio_request(120, "FPGA init");
   gpio_direction_input(120);
 

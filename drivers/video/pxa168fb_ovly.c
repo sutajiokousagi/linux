@@ -125,6 +125,9 @@ static struct _sViewPortOffset gViewPortOffset = {
 	.yOffset = 0
 };
 
+#define DEFAULT_WIDTH 1280
+#define DEFAULT_HEIGHT 720
+
 #ifdef FB_PM_DEBUG
 static unsigned int g_regs[1024];
 static unsigned int g_regs1[1024];
@@ -1100,6 +1103,20 @@ static int pxa168fb_ioctl(struct fb_info *fi, unsigned int cmd,
 			writel(x, fbi->reg_base + LCD_SPU_DMA_CTRL0);
 			atomic_set(&dma_flag, 1);
 		}
+#ifndef CONFIG_MACH_KOVAN
+		/* We always leave this on for Kovan */
+		if (0 == vid_on) {
+			x = readl(fbi->reg_base + LCD_SPU_DMA_CTRL0) &
+				FG_DMA_ENA_MASK;
+			writel(x, fbi->reg_base + LCD_SPU_DMA_CTRL0);
+			atomic_set(&dma_flag, 0);
+		} else {
+			x = readl(fbi->reg_base + LCD_SPU_DMA_CTRL0) |
+				CFG_DMA_ENA(0x1);
+			writel(x, fbi->reg_base + LCD_SPU_DMA_CTRL0);
+			atomic_set(&dma_flag, 1);
+		}
+#endif
 		break;
         case FB_IOCTL_SWITCH_GRA_OVLY:
 		if (copy_from_user(&gfx_on, argp, sizeof(int))){
@@ -1191,7 +1208,17 @@ static int pxa168fb_ioctl(struct fb_info *fi, unsigned int cmd,
 		val &= ~CFG_ALPHA_MODE_MASK;
 		val &= ~CFG_ALPHA_MASK;
 		val |= CFG_ALPHA_MODE(1);
+#ifdef CONFIG_MACH_KOVAN
+		/*
+		   * Update the colorkey alpha, so we maintain our new
+		   * alpha-blended state even if we alter the colorkeys
+		   */
+		fbi->ckey_alpha.alphapath = FB_GRA_PATH_ALPHA;
+		fbi->ckey_alpha.config = arg;
+		val |= CFG_ALPHA(arg) & CFG_ALPHA_MASK;
+#else
 		val |= CFG_ALPHA(0xff);
+#endif
 		writel(val, fbi->reg_base + LCD_SPU_DMA_CTRL1);
 		return 0;
 		break;
@@ -1382,6 +1409,7 @@ static int pxa168fb_release(struct fb_info *fi, int user)
 
 
 	if (atomic_dec_and_test(&global_op_count)) {
+#if !defined(CONFIG_MACH_KOVAN)
 		/* clear buffer list. */
 		mutex_lock(&fbi->access_ok);
 		clearFilterBuf(filterBufList, RESET_BUF);
@@ -1396,6 +1424,7 @@ static int pxa168fb_release(struct fb_info *fi, int user)
 			val &= ~(CFG_DMA_ENA_MASK);
 			writel(val, fbi->reg_base + LCD_SPU_DMA_CTRL0);
 		}
+#endif
 	}
 	fbi->active = 0;
 
@@ -1561,6 +1590,11 @@ static void set_dma_control0(struct pxa168fb_info *fbi)
 	 */
 	x |= ((fbi->pix_fmt & ~0x1000) >> 1) << 20;
 
+//#if defined(CONFIG_MACH_CHUMBY_SILVERMOON)
+//	if (fbi->interlaced)
+//		x |= 0x80;
+//#endif 
+
 	/*
 	 * color format in memory:
 	 * PXA168/PXA910:
@@ -1679,6 +1713,21 @@ static void set_graphics_start(struct fb_info *fi, int xoffset, int yoffset)
 	}
 }
 
+static void set_dumb_screen_dimensions(struct fb_info *info)
+{
+	struct pxa168fb_info *fbi = info->par;
+	struct fb_var_screeninfo *v = &info->var;
+	int x;
+	int y;
+
+	dev_dbg(info->dev, "Enter %s\n", __FUNCTION__);
+
+	x = v->xres + v->right_margin + v->hsync_len + v->left_margin;
+	y = v->yres + v->lower_margin + v->vsync_len + v->upper_margin;
+
+	writel((y << 16) | x, fbi->reg_base + LCD_SPUT_V_H_TOTAL);
+}
+
 static int pxa168fb_set_par(struct fb_info *fi)
 {
 	struct pxa168fb_info *fbi = fi->par;
@@ -1743,6 +1792,31 @@ static int pxa168fb_set_par(struct fb_info *fi)
         
         yzoom = fbi->surface.viewPortInfo.zoomYSize;
         xzoom = fbi->surface.viewPortInfo.zoomXSize;
+
+#if defined(CONFIG_MACH_KOVAN)
+	/*
+	   * Re-point the graphics display at the RGB buffer if it's RGB data
+	   * we're displaying now.
+	   */
+	if(fbi->pix_fmt >= 0 && fbi->pix_fmt < 10) {
+		dma_base_address = (unsigned int)fbi->fb_start_dma;
+		fbi->new_addr[0] = (unsigned int)fbi->fb_start_dma;
+
+		/* Reset the yPitch to match the screen size */
+		fbi->surface.viewPortInfo.yPitch = var->xres_virtual * var->bits_per_pixel/8;
+	}
+
+	/*
+	   * Force the zoom on the second framebuffer to, by default, be the
+	   * same size as the screen.
+	   */
+	xzoom = var->xres;
+	yzoom = var->yres;
+
+	/* Fix the DMA queue depth, to prevent red lines on videos */
+	/* Note: Thsi register is called LCD_MISC_CNTL in the docs */
+	writel(0x4, fbi->reg_base + LCD_FIFO_DEPTH);
+#endif
         
         writel((yzoom << 16) | xzoom,
                fbi->reg_base + LCD_SPU_DZM_HPXL_VLN);
@@ -1767,6 +1841,26 @@ static int pxa168fb_set_par(struct fb_info *fi)
         fi->fix.smem_len = var->xres_virtual * var->yres_virtual * var->bits_per_pixel/8;
         fi->screen_size = fi->fix.smem_len;
 
+#if defined(CONFIG_MACH_KOVAN)
+	{
+		int old_yres;
+		old_yres = var->yres;
+		if (fbi->interlaced)
+			var->yres /= 2;
+		/*
+		   * Configure dumb panel ctrl regs & timings.
+		   */
+		set_dumb_screen_dimensions(fi);
+
+		writel((var->yres << 16) | var->xres,
+				fbi->reg_base + LCD_SPU_V_H_ACTIVE);
+		writel((var->left_margin << 16) | var->right_margin,
+				fbi->reg_base + LCD_SPU_H_PORCH);
+		writel((var->upper_margin << 16) | var->lower_margin,
+				fbi->reg_base + LCD_SPU_V_PORCH);
+		var->yres = old_yres;
+	}
+#endif
 
 	return 0;
 }
@@ -1895,7 +1989,7 @@ static struct fb_ops pxa168fb_ops = {
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
 	.fb_imageblit	= cfb_imageblit,
-	.fb_sync	= pxa168fb_fb_sync,
+	//.fb_sync	= pxa168fb_fb_sync,
 	.fb_ioctl	= pxa168fb_ioctl,
 };
 
@@ -1909,6 +2003,52 @@ static int __init get_ovly_size(char *str)
 }
 __setup("ovly_size=", get_ovly_size);
 
+struct pxa168fb_tasklet_data {
+	int irq;
+	struct pxa168fb_info *fbi;
+};
+static struct pxa168fb_tasklet_data tasklet_data;
+
+
+static void fpga_isr_bottom_half(unsigned long data) {
+	struct pxa168fb_tasklet_data *d = (struct pxa168fb_tasklet_data *)data;
+	struct pxa168fb_info *fbi = d->fbi;
+	char *envp[2];
+	char *env = NULL;
+
+	if (d->irq == gpio_to_irq(93))
+		env = "TYPE=alarm";
+	else if (d->irq == gpio_to_irq(92))
+		env = "TYPE=trigger";
+	else if (d->irq == gpio_to_irq(91))
+		if (__gpio_get_value(91))
+			env = "TYPE=attach";
+		else
+			env = "TYPE=detach";
+	else if( d->irq == gpio_to_irq(117))
+		if (__gpio_get_value(117))
+			env = "TYPE=src_attach";
+		else
+			env = "TYPE=src_detach";
+	else
+		dev_err(fbi->fb_info->dev, "Unrecognized IRQ: %d", d->irq);
+
+	envp[0] = env;
+	envp[1] = NULL;
+	kobject_uevent_env(&(fbi->dev->kobj), KOBJ_CHANGE, envp);
+}
+
+DECLARE_TASKLET(fpga_tasklet, fpga_isr_bottom_half, (unsigned long)&tasklet_data);
+
+static irqreturn_t fpga_isr_top_half(int irqno, void *dev_id) {
+	struct pxa168fb_info *fbi = (struct pxa168fb_info *)dev_id;
+	tasklet_data.fbi = fbi;
+	tasklet_data.irq = irqno;
+	tasklet_schedule(&fpga_tasklet);
+	return IRQ_HANDLED;
+}
+
+
 static int pxa168fb_probe(struct platform_device *pdev)
 {
 	struct pxa168fb_mach_info *mi;
@@ -1917,6 +2057,7 @@ static int pxa168fb_probe(struct platform_device *pdev)
 	struct resource *res;
 	int ret;
         int temp;
+	unsigned long old_addr;
 
 	mi = pdev->dev.platform_data;
 	if (mi == NULL)
@@ -1975,6 +2116,7 @@ static int pxa168fb_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto failed;
 	}
+	old_addr = (unsigned long)readl(fbi->reg_base + 0x0c0);
 
 	/*
 	 * Allocate framebuffer memory.
@@ -2028,6 +2170,34 @@ static int pxa168fb_probe(struct platform_device *pdev)
 	pxa168fb_set_par(fi);
 	fbi->active = mi->active;
 
+#ifdef CONFIG_MACH_KOVAN
+	/* Copy the framebuffer from the old offset to the new one */
+	{
+		char *old_fb = (char *)ioremap(old_addr, DEFAULT_WIDTH*DEFAULT_HEIGHT*2);
+		if(old_fb) {
+			memcpy(fbi->fb_start, old_fb, DEFAULT_WIDTH*DEFAULT_HEIGHT*2);
+			iounmap(old_fb);
+		}
+		else
+			dev_err(&pdev->dev, "Unable to call ioremap!");
+	}
+
+	/* Set alpha to full-on by default */
+	//fbi->ckey_alpha.alphapath = FB_CONFIG_ALPHA;
+	fbi->ckey_alpha.alphapath = FB_GRA_PATH_ALPHA;
+	fbi->ckey_alpha.config = 0xff;
+
+	/* Switch fb1 to RGB565, leaving this fb0 as ARGB8888 */
+	//writel(0x08401111, fbi->reg_base + LCD_SPU_DMA_CTRL0);
+	/*
+	   * Switch to custom alpha, and make fb0 transparent.
+	   * This will allow us to keep fb1 as RGB565, and leave it with the logo
+	   * that was drawn in the bootloader, while we switch this framebuffer
+	   * to ARGB8888 and redraw the logo.
+	   */
+	//writel(0x20020081, fbi->reg_base + LCD_SPU_DMA_CTRL1);
+	writel(0x90000001, fbi->reg_base + LCD_CFG_SCLK_DIV);
+#else
 	/*
 	 * Configure default register values.
 	 */
@@ -2040,6 +2210,7 @@ static int pxa168fb_probe(struct platform_device *pdev)
         temp = readl(fbi->reg_base + LCD_SPU_DMA_CTRL0);
         temp &= ~(CFG_DMA_ENA_MASK);
         writel(temp, fbi->reg_base + LCD_SPU_DMA_CTRL0);
+#endif
 
 	/*
 	 * Allocate color map.
@@ -2071,6 +2242,53 @@ static int pxa168fb_probe(struct platform_device *pdev)
 		goto failed;
 	}
 
+
+		/* Allocate the HPD interrupt GPIO */
+	gpio_request(91, "HPD report");
+	gpio_direction_input(91);
+
+	/* Allocate the HPD IRQ */
+	ret = request_irq(IRQ_GPIO(91), fpga_isr_top_half,
+			IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_SAMPLE_RANDOM,
+			"HPD trigger", fbi);
+	if (ret)
+		dev_err(&pdev->dev, "Can't allocate IRQ 91 for HPD trigger");
+
+
+	/* Allocate the hdcp interrupt GPIO */
+	gpio_request(92, "HDCP Aksv ready");
+	gpio_direction_input(92);
+
+	/* Allocate the hdcp interrupt IRQ */
+	ret = request_irq(IRQ_GPIO(92), fpga_isr_top_half,
+			IRQF_TRIGGER_RISING | IRQF_SAMPLE_RANDOM,
+			"HDCP Aksv ready", fbi);
+	if(ret)
+		dev_err(&pdev->dev, "Can't allocate IRQ 92 for HDCP trigger");
+
+
+	/* Allocate the low voltage interrupt GPIO */
+	gpio_request(93, "Low voltage emergency");
+	gpio_direction_input(93);
+
+	/* Allocate the low voltage IRQ */
+	ret = request_irq(IRQ_GPIO(93), fpga_isr_top_half,
+			IRQF_TRIGGER_RISING | IRQF_SAMPLE_RANDOM,
+			"Low voltage emergency", fbi);
+	if (ret)
+		dev_err(&pdev->dev, "Can't allocate IRQ 93 for low voltage interrupt");
+
+	/* Allocate the source status change interrupt */
+	gpio_request(117, "Source PLL lock status change");
+	gpio_direction_input(117);
+
+	/* Allocate the source status change IRQ */
+	ret = request_irq(IRQ_GPIO(117), fpga_isr_top_half,
+			IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_SAMPLE_RANDOM,
+			"Source PLL lock status change", fbi);
+	if (ret)
+		dev_err(&pdev->dev, "Can't allocate IRQ 117 for low voltage interrupt");
+
 	/*
 	 * Enable Video interrupt
 	 */
@@ -2100,6 +2318,35 @@ static int pxa168fb_probe(struct platform_device *pdev)
 #ifdef CONFIG_DVFM
 	dvfm_register("overlay1", &dvfm_dev_idx);
 #endif
+
+	{
+		struct fb_var_screeninfo *var = &fi->var;
+		u32 val;
+		fbi->new_addr[0] = 0;
+		fbi->new_addr[1] = 0;
+		fbi->new_addr[2] = 0;
+		fi->fix.smem_start = fbi->fb_start_dma;
+		fi->screen_base = fbi->fb_start;
+		fbi->surface.videoMode = -1;
+		fbi->surface.viewPortInfo.srcWidth = var->xres;
+		fbi->surface.viewPortInfo.srcHeight = var->yres;
+		fbi->active = 1;
+		set_pix_fmt(var, fbi->pix_fmt);
+		pxa168fb_set_par(fi);
+
+		/* clear buffer list. */
+
+		clearFilterBuf(filterBufList, RESET_BUF);
+		clearFreeBuf(freeBufList, RESET_BUF|FREE_ENTRY);
+
+		/* Compatibility with older PXA behavior.
+		   Force Video DMA engine on during the OPEN.
+		   */
+
+		val = readl(fbi->reg_base + LCD_SPU_DMA_CTRL0);
+		val |= CFG_DMA_ENA_MASK;
+		writel(val, fbi->reg_base + LCD_SPU_DMA_CTRL0);
+	}
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	/*
